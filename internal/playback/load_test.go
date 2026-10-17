@@ -87,7 +87,7 @@ func TestThousandPerMinuteAndPlayback(t *testing.T) {
 }
 
 func containsDecision(body, decision string) bool {
-	return len(body) > 0 && (body == decision || len(body) >= len(decision) && search(body, `"Decision":"`+decision+`"`))
+	return len(body) > 0 && (body == decision || len(body) >= len(decision) && search(body, `"decision":"`+decision+`"`))
 }
 
 func search(hay, needle string) bool {

@@ -9,6 +9,7 @@ paths:
     post:
       operationId: scoreEvent
       summary: Score a synthetic transaction event (implemented)
+      description: Runtime listens at HTTP_ADDR (default :8103). Exact decimal amount is parsed directly from JSON text; event_id is deterministic replay identity. No velocity rule is currently enabled.
       parameters:
         - in: header
           name: Idempotency-Key
@@ -21,7 +22,7 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/ScoreRequest'
-            example: {event_id: evt-001, account: acct-001, amount: 125.50, currency: USD}
+            example: {event_id: evt-001, account: acct-001, amount: '125.50', currency: USD}
       responses:
         '200':
           description: Deterministic score result; replaying event_id returns the same decision.
@@ -29,7 +30,6 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/ScoreResponse'}
         '400': {description: Invalid JSON}
-        '500': {description: Scoring failure}
   /v1/events/{event_id}/explanation:
     get:
       operationId: getExplanation
@@ -63,7 +63,7 @@ components:
         amount:
           type: string
           pattern: '^(0|[1-9][0-9]*)(\.[0-9]{1,2})?$'
-          description: Exact decimal amount, canonical string; USD scale 2. Legacy numeric baseline accepted temporarily by code.
+          description: Exact decimal amount, canonical string; USD scale 2. Legacy JSON numeric tokens are accepted and parsed directly as decimal text, never through float64.
         currency: {type: string, pattern: '^[A-Z]{3}$'}
         payee_id: {type: string}
         country: {type: string}

@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/TuanKietTran/fraud-detection-go/internal/api"
 	"github.com/TuanKietTran/fraud-detection-go/internal/query"
@@ -19,6 +20,10 @@ func main() {
 	r.Use(middleware.Recoverer)
 	r.Mount("/v1", handlers.Routes())
 
-	log.Println("Fraud Detection API listening on :8082")
-	log.Fatal(http.ListenAndServe(":8082", r))
+	addr := os.Getenv("HTTP_ADDR")
+	if addr == "" {
+		addr = ":8103"
+	}
+	log.Println("Fraud Detection API listening on " + addr)
+	log.Fatal(http.ListenAndServe(addr, r))
 }
