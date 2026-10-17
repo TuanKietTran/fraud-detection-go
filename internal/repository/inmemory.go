@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/example/fraud-detection/internal/domain"
+	"github.com/TuanKietTran/fraud-detection-go/internal/domain"
 	"github.com/google/uuid"
 )
 

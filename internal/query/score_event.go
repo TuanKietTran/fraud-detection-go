@@ -3,7 +3,7 @@ package query
 import (
 	"context"
 
-	"github.com/example/fraud-detection/internal/domain"
+	"github.com/TuanKietTran/fraud-detection-go/internal/domain"
 )
 
 type ScoreEventQuery struct {

@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/example/fraud-detection/internal/api"
-	"github.com/example/fraud-detection/internal/query"
+	"github.com/TuanKietTran/fraud-detection-go/internal/api"
+	"github.com/TuanKietTran/fraud-detection-go/internal/query"
 	"github.com/go-chi/chi/v5"
 )
 

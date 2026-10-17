@@ -1,4 +1,4 @@
-module github.com/example/fraud-detection
+module github.com/TuanKietTran/fraud-detection-go
 
 go 1.22
 
