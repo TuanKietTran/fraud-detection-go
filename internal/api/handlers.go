@@ -21,10 +21,15 @@ func (h *Handlers) Routes() chi.Router {
 }
 
 type scoreReq struct {
-	EventID  string          `json:"event_id"`
-	Amount   json.RawMessage `json:"amount"`
-	Currency string          `json:"currency"`
-	Account  string          `json:"account"`
+	EventID        string          `json:"event_id"`
+	Amount         json.RawMessage `json:"amount"`
+	Currency       string          `json:"currency"`
+	Account        string          `json:"account"`
+	RecentCount    int             `json:"recent_count"`
+	GeoMismatch    bool            `json:"geo_mismatch"`
+	DeviceMismatch bool            `json:"device_mismatch"`
+	NewPayee       bool            `json:"new_payee"`
+	Structuring    bool            `json:"structuring"`
 }
 type scoreResponse struct {
 	EventID  string          `json:"event_id"`
@@ -60,7 +65,7 @@ func (h *Handlers) scoreEvent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 400)
 		return
 	}
-	res, err := h.score.Handle(r.Context(), query.ScoreEventQuery{EventID: req.EventID, AmountCents: cents, Account: req.Account})
+	res, err := h.score.Handle(r.Context(), query.ScoreEventQuery{EventID: req.EventID, AmountCents: cents, Account: req.Account, RecentCount: req.RecentCount, GeoMismatch: req.GeoMismatch, DeviceMismatch: req.DeviceMismatch, NewPayee: req.NewPayee, Structuring: req.Structuring})
 	if err != nil {
 		http.Error(w, err.Error(), 400)
 		return
