@@ -1,0 +1,78 @@
+openapi: 3.0.3
+info:
+  title: Fraud Detection API
+  version: 1.0.0
+servers:
+  - url: http://localhost:8103
+paths:
+  /v1/score:
+    post:
+      operationId: scoreEvent
+      summary: Score a synthetic transaction event (implemented)
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: false
+          schema: { type: string }
+          description: Optional; event_id is the replay identity for scoring.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScoreRequest'
+            example: {event_id: evt-001, account: acct-001, amount: 125.50, currency: USD}
+      responses:
+        '200':
+          description: Deterministic score result; replaying event_id returns the same decision.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ScoreResponse'}
+        '400': {description: Invalid JSON}
+        '500': {description: Scoring failure}
+  /v1/events/{event_id}/explanation:
+    get:
+      operationId: getExplanation
+      summary: Planned; not implemented
+      parameters:
+        - {in: path, name: event_id, required: true, schema: {type: string}}
+      responses:
+        '200': {description: Planned explanation}
+        '404': {description: Planned missing event response}
+  /v1/rules:
+    get:
+      operationId: getRules
+      summary: Planned; not implemented
+      responses:
+        '200': {description: Planned current rule configuration}
+  /v1/feedback:
+    post:
+      operationId: submitFeedback
+      summary: Planned; not implemented
+      responses:
+        '202': {description: Planned accepted feedback}
+        '400': {description: Planned invalid feedback}
+components:
+  schemas:
+    ScoreRequest:
+      type: object
+      required: [event_id, account, amount, currency]
+      properties:
+        event_id: {type: string, minLength: 1}
+        account: {type: string, minLength: 1}
+        amount:
+          type: string
+          pattern: '^(0|[1-9][0-9]*)(\.[0-9]{1,2})?$'
+          description: Exact decimal amount, canonical string; USD scale 2. Legacy numeric baseline accepted temporarily by code.
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        payee_id: {type: string}
+        country: {type: string}
+        device_id: {type: string}
+    ScoreResponse:
+      type: object
+      required: [event_id, score, decision, reasons]
+      properties:
+        event_id: {type: string}
+        score: {type: integer, minimum: 0, maximum: 100}
+        decision: {type: string, enum: [ALLOW, REVIEW, DENY, BLOCK]}
+        reasons: {type: array, items: {type: string}}
