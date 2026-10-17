@@ -33,13 +33,28 @@ func TestOpenAPIParsedRoutesAndStatuses(t *testing.T) {
 			t.Errorf("OpenAPI missing status %s", status)
 		}
 	}
+	for _, route := range []struct {
+		path, method string
+		statuses     []string
+	}{{"/v1/events/{event_id}/explanation", "get", []string{"200", "404"}}, {"/v1/rules", "get", []string{"200"}}, {"/v1/feedback", "post", []string{"202", "400"}}} {
+		operation, ok := doc.Paths[route.path][route.method]
+		if !ok {
+			t.Errorf("OpenAPI missing %s %s", route.method, route.path)
+			continue
+		}
+		for _, status := range route.statuses {
+			if _, ok := operation.Responses[status]; !ok {
+				t.Errorf("OpenAPI missing %s %s", route.path, status)
+			}
+		}
+	}
 	h := NewHandlers(query.NewScoreEventHandler())
 	for _, tc := range []struct {
-		body string
-		want int
-	}{{`{"event_id":"e","account":"a","amount":"6000.00","currency":"USD"}`, 200}, {`{"event_id":"e","account":"a","amount":"1.001","currency":"USD"}`, 400}} {
+		method, path, body string
+		want               int
+	}{{http.MethodPost, "/score", `{"event_id":"e","account":"a","amount":"6000.00","currency":"USD"}`, 200}, {http.MethodPost, "/score", `{"event_id":"e","account":"a","amount":"1.001","currency":"USD"}`, 400}, {http.MethodGet, "/rules", "", 200}, {http.MethodGet, "/events/e/explanation", "", 200}, {http.MethodPost, "/feedback", `{"event_id":"e","label":"CONFIRMED_FRAUD"}`, 202}, {http.MethodGet, "/events/missing/explanation", "", 404}} {
 		rec := httptest.NewRecorder()
-		h.Routes().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/score", strings.NewReader(tc.body)))
+		h.Routes().ServeHTTP(rec, httptest.NewRequest(tc.method, tc.path, strings.NewReader(tc.body)))
 		if rec.Code != tc.want {
 			t.Errorf("actual POST /v1/score status=%d want=%d", rec.Code, tc.want)
 		}

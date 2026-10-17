@@ -9,49 +9,47 @@ paths:
     post:
       operationId: scoreEvent
       summary: Score a synthetic transaction event (implemented)
-      description: Runtime listens at HTTP_ADDR (default :8103). Exact decimal amount is parsed directly from JSON text. In-process replay store returns identical results for an identical event_id/payload and rejects changed payloads. Store is memory-only; recent_count is supplied by caller and is not accumulated internally.
-      parameters:
-        - in: header
-          name: Idempotency-Key
-          required: false
-          schema: { type: string }
-          description: Optional; event_id is the replay identity for scoring.
+      description: Runtime listens at HTTP_ADDR (default :8103). Exact decimal amount is parsed directly from JSON text. In-process replay returns identical results for identical event_id/payload and rejects changed payloads. recent_count is caller-supplied; velocity is not internally accumulated.
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/ScoreRequest'
+            schema: {$ref: '#/components/schemas/ScoreRequest'}
             example: {event_id: evt-001, account: acct-001, amount: '125.50', currency: USD}
       responses:
         '200':
-          description: Deterministic score result; replaying event_id returns the same decision.
+          description: Deterministic scoring result; BLOCK is a legacy alias of DENY.
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ScoreResponse'}
-        '400': {description: Invalid JSON, invalid decimal/currency/fields, or event_id replay payload conflict}
+        '400': {description: Invalid JSON, amount/currency/fields, or replay payload conflict}
   /v1/events/{event_id}/explanation:
     get:
       operationId: getExplanation
-      summary: Planned; not implemented
+      summary: Get in-memory scoring explanation (implemented)
       parameters:
         - {in: path, name: event_id, required: true, schema: {type: string}}
       responses:
-        '200': {description: Planned explanation}
-        '404': {description: Planned missing event response}
+        '200': {description: Scored event and named reasons}
+        '404': {description: Event not found in this process}
   /v1/rules:
     get:
       operationId: getRules
-      summary: Planned; not implemented
+      summary: Get active default rule configuration (implemented)
       responses:
-        '200': {description: Planned current rule configuration}
+        '200': {description: Current in-memory rules}
   /v1/feedback:
     post:
       operationId: submitFeedback
-      summary: Planned; not implemented
+      summary: Submit a feedback label (implemented, in-memory deterministic threshold adjustment)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FeedbackRequest'}
       responses:
-        '202': {description: Planned accepted feedback}
-        '400': {description: Planned invalid feedback}
+        '202': {description: Feedback applied}
+        '400': {description: Invalid or conflicting feedback}
 components:
   schemas:
     ScoreRequest:
@@ -63,9 +61,9 @@ components:
         amount:
           type: string
           pattern: '^(0|[1-9][0-9]*)(\.[0-9]{1,2})?$'
-          description: Exact decimal amount, canonical string; USD scale 2. Legacy JSON numeric tokens are accepted and parsed directly as decimal text, never through float64.
-        currency: {type: string, pattern: '^[A-Z]{3}$'}
-        recent_count: {type: integer, minimum: 0, description: Caller-supplied account/window count; not persisted or deduplicated yet.}
+          description: Exact decimal amount; USD scale 2. Transitional numeric JSON tokens are parsed directly as decimal text.
+        currency: {type: string, enum: [USD]}
+        recent_count: {type: integer, minimum: 0, description: Caller-provided count; not accumulated internally.}
         geo_mismatch: {type: boolean}
         device_mismatch: {type: boolean}
         new_payee: {type: boolean}
@@ -78,3 +76,9 @@ components:
         score: {type: integer, minimum: 0, maximum: 100}
         decision: {type: string, enum: [ALLOW, REVIEW, DENY, BLOCK]}
         reasons: {type: array, items: {type: string}}
+    FeedbackRequest:
+      type: object
+      required: [event_id, label]
+      properties:
+        event_id: {type: string}
+        label: {type: string, enum: [CONFIRMED_FRAUD, FALSE_POSITIVE]}

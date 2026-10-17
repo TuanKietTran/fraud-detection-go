@@ -20,16 +20,51 @@ type replayRecord struct {
 	result domain.RiskDecision
 }
 type ScoreEventHandler struct {
-	mu     sync.Mutex
-	replay map[string]replayRecord
-	config domain.RuleConfig
+	mu       sync.Mutex
+	replay   map[string]replayRecord
+	config   domain.RuleConfig
+	feedback map[string]string
 }
 
 func NewScoreEventHandler() *ScoreEventHandler {
 	return NewScoreEventHandlerWithConfig(domain.DefaultRuleConfig())
 }
 func NewScoreEventHandlerWithConfig(c domain.RuleConfig) *ScoreEventHandler {
-	return &ScoreEventHandler{replay: make(map[string]replayRecord), config: c}
+	return &ScoreEventHandler{replay: make(map[string]replayRecord), config: c, feedback: make(map[string]string)}
+}
+func (h *ScoreEventHandler) Rules() domain.RuleConfig {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.config
+}
+func (h *ScoreEventHandler) Explain(eventID string) (domain.RiskDecision, bool) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	r, ok := h.replay[eventID]
+	return r.result, ok
+}
+func (h *ScoreEventHandler) Feedback(eventID, label string) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if _, ok := h.replay[eventID]; !ok {
+		return errors.New("event not found")
+	}
+	if label != "CONFIRMED_FRAUD" && label != "FALSE_POSITIVE" {
+		return errors.New("invalid feedback label")
+	}
+	if old, ok := h.feedback[eventID]; ok {
+		if old == label {
+			return nil
+		}
+		return errors.New("feedback conflict")
+	}
+	h.feedback[eventID] = label
+	if label == "CONFIRMED_FRAUD" && h.config.ReviewAt > 1 {
+		h.config.ReviewAt--
+	} else if label == "FALSE_POSITIVE" && h.config.ReviewAt < 100 {
+		h.config.ReviewAt++
+	}
+	return nil
 }
 func (h *ScoreEventHandler) Handle(ctx context.Context, q ScoreEventQuery) (domain.RiskDecision, error) {
 	if err := ctx.Err(); err != nil {

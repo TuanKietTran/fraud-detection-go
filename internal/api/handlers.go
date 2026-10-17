@@ -17,6 +17,9 @@ func NewHandlers(s *query.ScoreEventHandler) *Handlers { return &Handlers{score:
 func (h *Handlers) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Post("/score", h.scoreEvent)
+	r.Get("/events/{event_id}/explanation", h.explanation)
+	r.Get("/rules", h.rules)
+	r.Post("/feedback", h.feedback)
 	return r
 }
 
@@ -31,6 +34,10 @@ type scoreReq struct {
 	NewPayee       bool            `json:"new_payee"`
 	Structuring    bool            `json:"structuring"`
 }
+type feedbackRequest struct {
+	EventID string `json:"event_id"`
+	Label   string `json:"label"`
+}
 type scoreResponse struct {
 	EventID  string          `json:"event_id"`
 	Score    int             `json:"score"`
@@ -38,6 +45,31 @@ type scoreResponse struct {
 	Reasons  []string        `json:"reasons"`
 }
 
+func (h *Handlers) explanation(w http.ResponseWriter, r *http.Request) {
+	result, ok := h.score.Explain(chi.URLParam(r, "event_id"))
+	if !ok {
+		http.Error(w, "event not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(scoreResponse{result.EventID, result.Score, result.Decision, result.ReasonCodes})
+}
+func (h *Handlers) rules(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(h.score.Rules())
+}
+func (h *Handlers) feedback(w http.ResponseWriter, r *http.Request) {
+	var req feedbackRequest
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
+		http.Error(w, "invalid json", 400)
+		return
+	}
+	if err := h.score.Feedback(req.EventID, req.Label); err != nil {
+		http.Error(w, err.Error(), 400)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
 func (h *Handlers) scoreEvent(w http.ResponseWriter, r *http.Request) {
 	var req scoreReq
 	dec := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
