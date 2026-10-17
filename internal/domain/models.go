@@ -11,9 +11,9 @@ const (
 )
 
 type RiskDecision struct {
-	ID         uuid.UUID
-	EventID    string
-	Score      int
-	Decision   Decision
+	ID          uuid.UUID
+	EventID     string
+	Score       int
+	Decision    Decision
 	ReasonCodes []string
 }
