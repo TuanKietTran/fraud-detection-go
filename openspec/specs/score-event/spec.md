@@ -53,8 +53,16 @@ The optional PostgreSQL adapter SHALL atomically retain replay identities, decis
 - **AND** replay of feedback does not apply it again.
 
 ### Requirement: Reject invalid JSON
-The service SHALL reject malformed or trailing JSON with HTTP 400.
+Score and feedback SHALL reject malformed/trailing JSON with HTTP 400 and bodies exceeding 1048576 bytes with HTTP 413. Errors SHALL have JSON shape {error:{code,message},request_id}, matching X-Request-ID. IDs SHALL be server-generated rather than reflecting untrusted input.
 
 #### Scenario: Not JSON
 - **WHEN** a score body is not JSON
-- **THEN** the response is HTTP 400.
+- **THEN** the response is HTTP 400 with the invalid_json code and a request ID.
+
+### Requirement: Store failure and panic containment
+A failed store SHALL NOT produce a successful rules/explanation/feedback response. Repository failure SHALL return 503, request cancellation or deadline 408, and recovered panic 500. Internal error details SHALL NOT be exposed. Legacy replay/feedback conflicts remain HTTP 400 as explicitly documented in OpenAPI.
+
+#### Scenario: Failed explanation lookup
+- **GIVEN** a repository returning a synthetic internal error
+- **WHEN** an explanation is requested
+- **THEN** response is 503 unavailable with no internal error detail and a request ID.

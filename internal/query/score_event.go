@@ -3,10 +3,17 @@ package query
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/TuanKietTran/fraud-detection-go/internal/domain"
 	"github.com/TuanKietTran/fraud-detection-go/internal/repository"
+)
+
+var (
+	ErrInvalid  = errors.New("invalid request")
+	ErrConflict = errors.New("payload conflict")
+	ErrNotFound = errors.New("event not found")
 )
 
 type ScoreEventQuery = repository.EventInput
@@ -72,16 +79,16 @@ func (h *ScoreEventHandler) Feedback(eventID, label string) error {
 func (h *ScoreEventHandler) FeedbackContext(ctx context.Context, eventID, label string) error {
 	return h.store.Update(ctx, func(s *repository.EventState) error {
 		if _, ok := s.Events[eventID]; !ok {
-			return errors.New("event not found")
+			return ErrNotFound
 		}
 		if label != "CONFIRMED_FRAUD" && label != "FALSE_POSITIVE" {
-			return errors.New("invalid feedback label")
+			return fmt.Errorf("%w: invalid feedback label", ErrInvalid)
 		}
 		if old, ok := s.Feedback[eventID]; ok {
 			if old == label {
 				return nil
 			}
-			return errors.New("feedback conflict")
+			return fmt.Errorf("%w: feedback conflict", ErrConflict)
 		}
 		s.Feedback[eventID] = label
 		if label == "CONFIRMED_FRAUD" && s.Rules.ReviewAt > 1 {
@@ -97,13 +104,13 @@ func (h *ScoreEventHandler) Handle(ctx context.Context, q ScoreEventQuery) (doma
 		return domain.RiskDecision{}, err
 	}
 	if q.EventID == "" || q.Account == "" || q.AmountCents < 0 || q.RecentCount < 0 {
-		return domain.RiskDecision{}, errors.New("event_id, account and nonnegative amount/count required")
+		return domain.RiskDecision{}, fmt.Errorf("%w: event_id, account and nonnegative amount/count required", ErrInvalid)
 	}
 	var result domain.RiskDecision
 	err := h.store.Update(ctx, func(s *repository.EventState) error {
 		if old, ok := s.Events[q.EventID]; ok {
 			if old.Input != q {
-				return errors.New("event_id replay payload conflict")
+				return fmt.Errorf("%w: event_id replay payload conflict", ErrConflict)
 			}
 			result = cloneDecision(old.Result)
 			return nil

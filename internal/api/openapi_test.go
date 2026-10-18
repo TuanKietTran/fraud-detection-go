@@ -28,7 +28,10 @@ func TestOpenAPIParsedRoutesAndStatuses(t *testing.T) {
 	if !ok {
 		t.Fatal("missing POST /v1/score")
 	}
-	for _, status := range []string{"200", "400"} {
+	if len(op.Responses) != 6 {
+		t.Errorf("score status set drift: %v", op.Responses)
+	}
+	for _, status := range []string{"200", "400", "408", "413", "500", "503"} {
 		if _, ok := op.Responses[status]; !ok {
 			t.Errorf("OpenAPI missing status %s", status)
 		}
@@ -36,11 +39,14 @@ func TestOpenAPIParsedRoutesAndStatuses(t *testing.T) {
 	for _, route := range []struct {
 		path, method string
 		statuses     []string
-	}{{"/v1/events/{event_id}/explanation", "get", []string{"200", "404"}}, {"/v1/rules", "get", []string{"200"}}, {"/v1/feedback", "post", []string{"202", "400"}}} {
+	}{{"/v1/events/{event_id}/explanation", "get", []string{"200", "404", "408", "500", "503"}}, {"/v1/rules", "get", []string{"200", "408", "500", "503"}}, {"/v1/feedback", "post", []string{"202", "400", "408", "413", "500", "503"}}} {
 		operation, ok := doc.Paths[route.path][route.method]
 		if !ok {
 			t.Errorf("OpenAPI missing %s %s", route.method, route.path)
 			continue
+		}
+		if len(operation.Responses) != len(route.statuses) {
+			t.Errorf("%s status set drift: %v", route.path, operation.Responses)
 		}
 		for _, status := range route.statuses {
 			if _, ok := operation.Responses[status]; !ok {

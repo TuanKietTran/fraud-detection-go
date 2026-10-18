@@ -23,12 +23,16 @@ Authoritative schemas and compatibility aliases: `api/openapi.yaml`.
 | 2026-10-17 | 1000 requests in one minute, retry, playback, coverage | `internal/playback`. 1000 scores plus one 503 retry each finished in 77ms. Replay returned the same decisions, including allow, review, and block. Statement coverage 55.9%. |
 | 2026-10-17 | Definition of done and playback storyboard | `openspec/dod.md` and `openspec/gifs/playback-flow.gif`. GIF review: retry stays at the pre-write state, playback shows the unchanged result. |
 | 2026-10-18 | Transactional account-window velocity | `ff6b560`; `go test -p 2 ./... -race -count=1 -coverprofile=<profile>`; domain 91.9%, weighted non-cmd 81.65%. |
-| 2026-10-18 | PostgreSQL adapter parity and database restart | Starting commit `ff6b560`; `go test -p 2 ./internal/repository -run TestPostgresEventParity -race -count=1 -v` passed with PostgreSQL 16.9. Card hash recorded in append-only STATUS. |
+| 2026-10-18 | PostgreSQL adapter parity and database restart | `3320761`; `go test -p 2 ./internal/repository -run TestPostgresEventParity -race -count=1 -v` passed with PostgreSQL 16.9. Card hash recorded in append-only STATUS. |
+
+## HTTP boundary checkpoint
+
+Starting commit `3320761`; `GOTOOLCHAIN=local FRAUD_POSTGRES_CACHE=<cache> go test -p 2 ./... -race -count=1 -coverprofile=<profile>`: API 95.0%, domain 91.9%, query 95.6%, repository 88.9%, playback 61.5%; weighted non-cmd 325/367 = 88.56%. Build/vet/tidy/format pass. Exact commit hash and full log path in STATUS-fraud.md.
 
 ## Pending mandatory work
 
 - Server-selected PostgreSQL repository and configuration updates (adapter/parity test implemented separately; server still defaults to process memory).
-- HTTP JSON errors, request IDs, readiness/metrics and runtime hardening.
+- Runtime readiness/metrics, structured access logs, validated env and server lifecycle/timeouts (JSON errors/request IDs/body limits/panic containment implemented).
 - Inferred structuring patterns (current contextual flag is supplied), measured p99 and operational docs.
 
 ## Native macOS continuation checkpoint

@@ -2,6 +2,7 @@ openapi: 3.0.3
 info:
   title: Fraud Detection API
   version: 1.0.0
+  description: All API responses carry a server-generated X-Request-ID. Errors are JSON envelopes with the same request_id. Write bodies are limited to 1048576 bytes and exactly one JSON value. Legacy replay/feedback conflicts remain HTTP 400.
 servers:
   - url: http://localhost:8103
 paths:
@@ -22,7 +23,11 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/ScoreResponse'}
-        '400': {description: Invalid JSON, amount/currency/fields, or replay payload conflict}
+        '400': {$ref: '#/components/responses/InvalidRequest'}
+        '408': {$ref: '#/components/responses/Timeout'}
+        '413': {$ref: '#/components/responses/TooLarge'}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '503': {$ref: '#/components/responses/Unavailable'}
   /v1/events/{event_id}/explanation:
     get:
       operationId: getExplanation
@@ -31,13 +36,19 @@ paths:
         - {in: path, name: event_id, required: true, schema: {type: string}}
       responses:
         '200': {description: Scored event and named reasons}
-        '404': {description: Event not found in this process}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '408': {$ref: '#/components/responses/Timeout'}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '503': {$ref: '#/components/responses/Unavailable'}
   /v1/rules:
     get:
       operationId: getRules
       summary: Get active default rule configuration (implemented)
       responses:
-        '200': {description: Current in-memory rules}
+        '200': {description: Current active rules}
+        '408': {$ref: '#/components/responses/Timeout'}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '503': {$ref: '#/components/responses/Unavailable'}
   /v1/feedback:
     post:
       operationId: submitFeedback
@@ -49,9 +60,55 @@ paths:
             schema: {$ref: '#/components/schemas/FeedbackRequest'}
       responses:
         '202': {description: Feedback applied}
-        '400': {description: Invalid or conflicting feedback}
+        '400': {$ref: '#/components/responses/InvalidRequest'}
+        '408': {$ref: '#/components/responses/Timeout'}
+        '413': {$ref: '#/components/responses/TooLarge'}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '503': {$ref: '#/components/responses/Unavailable'}
 components:
+  responses:
+    InvalidRequest:
+      description: Invalid JSON/fields, missing feedback event, or legacy payload conflict (400, not 409).
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    NotFound:
+      description: Event not found.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Timeout:
+      description: Request canceled or timed out.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    TooLarge:
+      description: Request body exceeds 1048576 bytes.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    InternalError:
+      description: Recovered internal panic; no sensitive details exposed.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Unavailable:
+      description: Scoring repository unavailable.
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
   schemas:
+    Error:
+      type: object
+      required: [error, request_id]
+      properties:
+        request_id: {type: string, description: Server-generated identifier also returned in X-Request-ID.}
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: {type: string}
+            message: {type: string}
     ScoreRequest:
       type: object
       required: [event_id, account, amount, currency]
