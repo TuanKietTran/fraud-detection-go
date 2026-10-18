@@ -8,12 +8,15 @@ Response-contract follow-up, 2026-10-19 (parent `9132b35`): full resumed native 
 
 Domain-invariant follow-up, 2026-10-19 (parent `2a09ede`): one native gate pass in `ctl/logs/fraud/card8-gates.log` / `card8.cover`; domain76/76=100.00%, weighted non-cmd511/558=91.58%, no uncovered domain statement blocks. Other package percentages unchanged from card7; actual repository/PostgreSQL suite89.162s, no skips. All six current-source gaps were feasible and reached; no safety check was removed/excluded. This is statement coverage plus explicit invariant assertions, not exhaustive input/branch proof.
 
+Startup-policy follow-up, 2026-10-19 (parent `7c0b261`): ONE native gate pass in `ctl/logs/fraud/card9-gates.log` / `card9.cover`; domain76/76=100.00%, weighted558/609=91.63%, service91.3%, other package percentages unchanged. Real repository/PostgreSQL85.354s without skips, including configured SQL initialization and actual restart retaining learned policy under changed/empty seeds.
+
 ## Met
 
 | Acceptance | Exact test / evidence |
 | --- | --- |
 | Exact nonnegative USD cents, supported scale/currency and overflow rejection without floats | `domain.TestParseMinorUnits`, `FuzzParseMinorUnits`, `TestMoneyRejectsMalformedTextWithoutPartialValue`, `TestMoneyExactScaleAndInt64Boundaries`; typed error/no-partial-value assertions, MaxInt64 and 1000 deterministic integer-only canonical round trips |
 | Strict amount boundaries and default decision bands | `domain.TestScoreAmountCentsBoundariesAndDecisions`, `domain.TestWeightedRulesAndValidation` (with no extra signals/history) |
+| Validated executable startup policy in memory/SQL, durable learned policy never reset | `service.TestStartupRulesDefaultsOverlayAndExactIntegerBoundaries`, `TestStartupRulesRejectUnknownDuplicateNullNonIntegerOverflowAndInvalidPolicy`, `TestStartupPolicyDrivesMemoryHTTPScoringAndFreshRestart`; `repository.TestPostgresEventParity` startup-policy subtests exercise actual configured HTTP scoring, changed/empty-seed reopen/database restart, feedback/replay identity and corrupt stored-policy startup rejection. FRAUD_RULES_JSON seeds new stores only; no online admin write API is required/provided. |
 | Every configured validation threshold/relationship/weight and fail-closed scoring | `domain.TestEveryRuleConfigThresholdAndRelationshipInvariant`, `TestEveryRuleWeightRejectsOutOfRangeAndAcceptsEndpoints`, `TestScoringRejectsNegativeSignalsWithoutPartialDecision`; all seven weights reject -1/101 and accept0/100 |
 | Weighted rules, exact REVIEW/DENY boundaries, score cap and retained deterministic reasons | `domain.TestWeightedRulesAndValidation`, `TestWeightedDecisionAndRuleActivationBoundaries`, `TestScoreCapRetainsAllReasonsAndDeterministicSignalProperties`; equal decision limits prioritize DENY, all seven reasons survive cap, adding a nonnegative geo signal cannot reduce score |
 | Same input/event identity returns original result; changed input rejected | `query.TestReplayReturnsSameAndRejectsChangedPayload`, `api.TestOpenAPIParsedRoutesAndStatuses` |
@@ -33,18 +36,17 @@ Domain-invariant follow-up, 2026-10-19 (parent `2a09ede`): one native gate pass 
 | Exact PascalCase policy integer serialization and negative contract drift detection | `api.TestRuleConfigSchemaMatchesExtremeExactIntegerSerialization`, `TestResponseSchemaChecksRejectPayloadDrift`, `TestPublishedResponseReferencesAndSchemaDefinitionsResolve`; int64-max amount configuration is preserved without floats |
 | Preserved playback regression:1000 score calls, one503 retry each, exact replay | `playback.TestThousandPerMinuteAndPlayback`; HTTP httptest, not separate service processes or S1 |
 | Client400 not retried; transient503 retried with bounded attempts | `playback.TestDoesNotRetryClientError`, `TestRetriesTransientFailure`, `TestStopsAfterMaxAttempts`; playback helper only, not a downstream production client |
-| Domain>=90%, weighted non-cmd>=80%, race clean | Latest domain76/76=100.00%, weighted511/558=91.58%; API96.0/query95.9/repository93.5/service90.9/playback61.5. `scripts.TestCoverageGateUsesWeightedStatementsAndDomainThreshold` asserts weighting/thresholds/excluded cmd behavior |
+| Domain>=90%, weighted non-cmd>=80%, race clean | Latest domain76/76=100.00%, weighted558/609=91.63%; API96.0/query95.9/repository93.5/service91.3/playback61.5. `scripts.TestCoverageGateUsesWeightedStatementsAndDomainThreshold` asserts weighting/thresholds/excluded cmd behavior |
 | Memory application-handler p99<5ms on measured isolated-account workload | `go run ./cmd/latency -samples 10000 -raw`: unique5459ns, replay4209ns; [environment and raw-sample scope](../docs/performance.md). Not HTTP/SQL latency or concurrent throughput |
 
 ## Partial
 
 | Acceptance | Implemented subset / missing work |
 | --- | --- |
-| Configurable validated policy | Domain accepts injected RuleConfig and deterministic feedback adjusts ReviewAt; executable seeds defaults. Runtime rule-edit API/policy env is not exposed. GET rules uses PascalCase exported field names. |
 | Scalable durable repository | SQL durability/parity proven, but singleton JSONB loads full history and serializes readers/writers. No relational per-event/account-time indexing or retention. Memory scoped account history is also unbounded. |
 | Full semantic OpenAPI validation | Explanation/rules success schemas and targeted v1 response-shape checks are implemented. The helper supports objects/arrays/strings/exact integer text, enums, required/extra properties, min/max/minLength and local references. It is not a full request/schema validator (patterns, general formats, cross-field relations and arbitrary OpenAPI composition are not verified). |
 | Under-two-minute clean-clone run | Minimal Go-only memory instructions supplied; cold download/clean-clone wall time is not measured. Local warm-cache compiled-process smoke checked12 HTTP operations and SIGTERM exit0 (`ctl/logs/fraud/card6-gates.log`); this is not a cold-clone claim. |
-| All error/shutdown branches and exhaustive input/path proof | Domain has100% statement coverage and explicit validation/money/decision invariants asserted, but that is not a proof over all inputs/branches. Service remains90.9%; shutdown/error-path completeness is not claimed. |
+| All error/shutdown branches and exhaustive input/path proof | Domain has100% statement coverage and explicit validation/money/decision invariants asserted, but that is not a proof over all inputs/branches. Service remains91.3%; shutdown/error-path completeness is not claimed. |
 | Hiring-manager documentation / CI | README, diagram, curl, glossary, ADRs and measured report supplied; workflow and weighted gate specified/tested locally, but hosted workflow remains UNVERIFIED: not run. |
 
 ## Unmet / not claimed

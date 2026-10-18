@@ -6,9 +6,12 @@ import (
 	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/TuanKietTran/fraud-detection-go/internal/domain"
 )
 
 type Config struct {
+	InitialRules                                    domain.RuleConfig
 	Address, DatabaseURL                            string
 	RequestTimeout, StartupTimeout, ShutdownTimeout time.Duration
 }
@@ -41,5 +44,10 @@ func LoadConfig(getenv func(string) string) (Config, error) {
 			return c, fmt.Errorf("DATABASE_URL must be a PostgreSQL URL")
 		}
 	}
+	rules, err := parseStartupRules(getenv("FRAUD_RULES_JSON"))
+	if err != nil {
+		return c, err
+	}
+	c.InitialRules = rules
 	return c, nil
 }

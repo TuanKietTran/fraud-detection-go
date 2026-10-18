@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/TuanKietTran/fraud-detection-go/internal/api"
-	"github.com/TuanKietTran/fraud-detection-go/internal/domain"
 	"github.com/TuanKietTran/fraud-detection-go/internal/query"
 	"github.com/TuanKietTran/fraud-detection-go/internal/repository"
 	"github.com/go-chi/chi/v5"
@@ -22,8 +21,11 @@ import (
 
 // OpenStore does not log connection information. Startup is bounded by caller.
 func OpenStore(ctx context.Context, c Config) (repository.EventStore, func(), error) {
+	if err := c.InitialRules.Validate(); err != nil {
+		return nil, nil, ErrStartupRules
+	}
 	if c.DatabaseURL == "" {
-		return repository.NewMemoryEvents(domain.DefaultRuleConfig()), func() {}, nil
+		return repository.NewMemoryEvents(c.InitialRules), func() {}, nil
 	}
 	config, err := pgxpool.ParseConfig(c.DatabaseURL)
 	if err != nil {
@@ -35,10 +37,16 @@ func OpenStore(ctx context.Context, c Config) (repository.EventStore, func(), er
 	if err != nil {
 		return nil, nil, errors.New("database pool initialization failed")
 	}
-	store, err := repository.NewPostgresEvents(ctx, pool, domain.DefaultRuleConfig())
+	store, err := repository.NewPostgresEvents(ctx, pool, c.InitialRules)
 	if err != nil {
 		pool.Close()
 		return nil, nil, errors.New("database event store initialization failed")
+	}
+	// Validate the active durable state as well as the incoming seed. The
+	// constructor inserts only when absent; never merge/reset existing policy.
+	if err := store.Update(ctx, func(*repository.EventState) error { return nil }); err != nil {
+		pool.Close()
+		return nil, nil, errors.New("database active policy validation failed")
 	}
 	return store, pool.Close, nil
 }
@@ -182,6 +190,6 @@ func Run(ctx context.Context, c Config, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	logger.Info("fraud server listening", "address", listener.Addr().String(), "durable", c.DatabaseURL != "")
+	logger.Info("fraud server listening", "address", listener.Addr().String(), "durable", c.DatabaseURL != "", "policy_mode", "seed-only; existing durable policy retained")
 	return Serve(ctx, server, listener, c.ShutdownTimeout)
 }

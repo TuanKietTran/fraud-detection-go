@@ -11,7 +11,7 @@
 
 ## Open acceptance (proposal remains Partial)
 
-- [ ] Runtime policy editing beyond injected RuleConfig and deterministic feedback (no API/env yet; route contract expansion through manager).
+- [x] Validated executable startup policy via bounded strict FRAUD_RULES_JSON, wired to memory/SQL scoring; existing durable learned policy/replay state takes precedence. Manager acceptance requires no online unauthenticated admin write API.
 - [ ] Scalable relational SQL and bounded account-history retention/time indexing (current durable snapshot is correctness-first).
 - [x] Complete explanation/rules success schemas and targeted response shape/reference checks for every existing v1 status.
 - [ ] Full semantic OpenAPI/request-schema validation beyond the explicitly supported response subset.

@@ -31,7 +31,7 @@ paths:
     post:
       operationId: scoreEvent
       summary: Score a synthetic transaction event (implemented)
-      description: Runtime listens at HTTP_ADDR (default :8103). DATABASE_URL selects durable PostgreSQL state; unset uses process-memory state. REQUEST_TIMEOUT defaults to 5s, STARTUP_TIMEOUT and SHUTDOWN_TIMEOUT to 10s (all positive, at most 1m). Exact decimal amount is parsed directly from JSON text. In-process replay returns identical results for identical event_id/payload and rejects changed payloads. Velocity counts prior unique account events in the last 60 seconds (exclusive lower boundary); replay never increments it. Legacy recent_count can raise but cannot lower the internal count. Memory state is lost at restart; PostgreSQL state is retained but serialized as one full-history snapshot.
+      description: Runtime listens at HTTP_ADDR (default :8103). DATABASE_URL selects durable PostgreSQL state; unset uses process-memory state. Optional FRAUD_RULES_JSON is an at-most8192-byte strict JSON object of canonical PascalCase integer RuleConfig overrides over defaults. It seeds new stores only; existing durable learned policy/replay state is never reset by startup, and invalid incoming or stored policy fails startup. REQUEST_TIMEOUT defaults to 5s, STARTUP_TIMEOUT and SHUTDOWN_TIMEOUT to 10s (all positive, at most 1m). Exact decimal amount is parsed directly from JSON text. In-process replay returns identical results for identical event_id/payload and rejects changed payloads. Velocity counts prior unique account events in the last 60 seconds (exclusive lower boundary); replay never increments it. Legacy recent_count can raise but cannot lower the internal count. Memory state is lost at restart; PostgreSQL state is retained but serialized as one full-history snapshot.
       requestBody:
         required: true
         content:
@@ -182,7 +182,7 @@ components:
     RuleConfig:
       type: object
       additionalProperties: false
-      description: Existing PascalCase serialization. ReviewAt must be <=DenyAt and VeryHighAmountCents >=HighAmountCents; these cross-field invariants are enforced by domain validation. Executable seeds defaults; feedback changes only ReviewAt.
+      description: Existing PascalCase serialization. ReviewAt must be <=DenyAt and VeryHighAmountCents >=HighAmountCents; these cross-field invariants are enforced by domain validation. Defaults plus optional strict FRAUD_RULES_JSON seed new stores only; existing durable policy is retained across startup. Feedback changes only ReviewAt.
       required: [ReviewAt, DenyAt, HighAmountCents, VeryHighAmountCents, HighAmountWeight, VeryHighAmountWeight, VelocityLimit, VelocityWeight, GeoMismatchWeight, DeviceMismatchWeight, NewPayeeWeight, StructuringWeight, StructuringBandCents]
       properties:
         ReviewAt: {type: integer, minimum: 1, maximum: 100}

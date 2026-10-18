@@ -161,6 +161,7 @@ func TestPostgresEventParity(t *testing.T) {
 			}
 		})
 	}
+	startupDSN := setupSQLStartupPolicyBeforeRestart(t, ctx, pool, config.GetConnectionURL())
 	// Restart the actual database, not just a handler, retaining its data directory.
 	pool.Close()
 	if err := pg.Stop(); err != nil {
@@ -173,6 +174,7 @@ func TestPostgresEventParity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	assertSQLStartupPolicyAfterRestart(t, ctx, startupDSN)
 	reopened, err := repository.NewPostgresEvents(ctx, pool, domain.DefaultRuleConfig())
 	if err != nil {
 		t.Fatal(err)
@@ -223,11 +225,26 @@ func TestPostgresEventParity(t *testing.T) {
 	if h.Rules().ReviewAt != 39 {
 		t.Fatal("invalid update was not rolled back")
 	}
+	if _, err := pool.Exec(ctx, `UPDATE fraud_state SET state=jsonb_set(state,'{Rules,ReviewAt}','0'::jsonb)`); err != nil {
+		t.Fatal(err)
+	}
+	if selected, closeSelected, err := service.OpenStore(ctx, runtimeConfig); err == nil || selected != nil || closeSelected != nil {
+		if closeSelected != nil {
+			closeSelected()
+		}
+		t.Fatal("invalid persisted policy did not fail startup")
+	}
 	if _, err := pool.Exec(ctx, `UPDATE fraud_state SET state='{}'::jsonb`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := h.LoadRules(ctx); err == nil {
 		t.Fatal("corrupt stored state accepted")
+	}
+	if selected, closeSelected, err := service.OpenStore(ctx, runtimeConfig); err == nil || selected != nil || closeSelected != nil {
+		if closeSelected != nil {
+			closeSelected()
+		}
+		t.Fatal("corrupt persisted state was silently reset at startup")
 	}
 	pool.Close()
 	if err := reopened.Update(ctx, func(*repository.EventState) error { return nil }); err == nil {

@@ -38,9 +38,13 @@ Card7 `2a09ede` (parent `9132b35`): explicit explanation and PascalCase RuleConf
 
 ## Domain invariant checkpoint
 
-Card8 parent `2a09ede`, verified 2026-10-19: current source/profile confirmed the six uncovered blocks in ParseMinorUnits and ScoreWithRules/RuleConfig.Validate. Meaningful malformed-money, invalid-policy and REVIEW assertions now reach all six. Tests also cover every configured limit/weight/relationship, exact int64/scale/currency boundaries, 1000 deterministic canonical money round trips, capped reason retention and deterministic/nondecreasing geo-signal properties. No production source, safety check, API or dependency changed.
+Card8 `7c0b261` (parent `2a09ede`), verified 2026-10-19: current source/profile confirmed the six uncovered blocks in ParseMinorUnits and ScoreWithRules/RuleConfig.Validate. Meaningful malformed-money, invalid-policy and REVIEW assertions now reach all six. Tests also cover every configured limit/weight/relationship, exact int64/scale/currency boundaries, 1000 deterministic canonical money round trips, capped reason retention and deterministic/nondecreasing geo-signal properties. No production source, safety check, API or dependency changed.
 
 One native format/build/vet/full-race/tidy/coverage gate pass succeeded; `ctl/logs/fraud/card8-gates.log` / `card8.cover`: domain76/76=100.00%, weighted non-cmd511/558=91.58%. API96.0%, query95.9%, repository93.5%, service90.9%, playback61.5%; actual SQL/repository suite89.162s, no skips. No remaining uncovered domain statement block or unreachable-exclusion claim; statement100% is not exhaustive input/path proof. Exact card commit recorded in append-only STATUS.
+
+## Startup policy checkpoint
+
+Parent `7c0b261`: bounded strict FRAUD_RULES_JSON overlays defaults only for initialization. Empty preserves defaults; unknown/duplicate/case-aliased/null/noninteger/overflow/invalid policy fails startup safely. Memory starts fresh; existing PostgreSQL state/feedback/replay wins unchanged across different/empty-seed reopen and actual DB restart. Active corrupt state fails rather than resets. ONE native gate pass: `ctl/logs/fraud/card9-gates.log` / `card9.cover`, domain76/76=100%, weighted558/609=91.63%, service91.3%; actual SQL/repository85.354s, no skips. Exact card hash in append-only STATUS. ADR005 defines initialization-before-listen semantics; broader scalability/full-schema/hostedCI acceptance remains Partial.
 
 ## Reproducible native gates
 
@@ -63,7 +67,7 @@ Structuring fuzz at `97c4c98`: `go test ./internal/domain -run '^$' -fuzz '^Fuzz
 
 The active `openspec/changes/production-fraud` proposal remains **Partial**, not archived as fully production-complete:
 
-- Validated RuleConfig injection and feedback learning exist, but no runtime policy-edit API/env. GET rules exposes PascalCase fields.
+- Configurable-policy acceptance is now met via strict FRAUD_RULES_JSON startup seeding and feedback; existing SQL learned state is never reset. No online admin write API is required/provided. GET rules retains PascalCase fields.
 - SQL stores one locked full-history JSONB snapshot. Memory scoped operations copy selected account history under one mutex; retention/time indexing/scalable relational SQL are missing.
 - Existing v1 response success/error schemas are declared and checked against handlers, including explanation/rules. The targeted helper is not a full semantic OpenAPI/request validator; arbitrary composition, patterns/formats and cross-field schema relations remain outside its scope.
 - Cold-clone under-two-minute timing, hosted CI, Linux/Windows, production migrations/backup/restore and real-process SQL HTTP crash drills are not verified.

@@ -168,3 +168,20 @@ Tests SHALL assert score bounds, deterministic repeated results, distinct retain
 - **GIVEN** valid configured signals triggering all seven rules
 - **WHEN** the sum exceeds100
 - **THEN** score is100 and all seven named reasons remain in deterministic order.
+
+### Requirement: Strict startup policy initialization
+FRAUD_RULES_JSON SHALL be at most8192 raw bytes and one object of canonical PascalCase integer RuleConfig overrides over defaults. Empty/whitespace or {} SHALL retain defaults. Unknown/case-aliased/duplicate keys, null/noninteger/overflow values, trailing JSON and invalid policy SHALL fail startup with sanitized errors. Typed seeds SHALL also be validated before initializing a store/listener.
+
+#### Scenario: Configured actual scoring
+- **GIVEN** high amount100cents, weight20 and ReviewAt20 startup overrides
+- **WHEN** a fresh account attempts USD2.00 via HTTP in memory or SQL mode
+- **THEN** score is20/REVIEW instead of default0/ALLOW.
+
+### Requirement: Existing durable policy takes precedence
+Seeds SHALL initialize only new memory stores or the first durable row. Existing PostgreSQL learned policy, feedback and replay state SHALL never be reset/merged by changed/empty seeds, including across database restart. Invalid incoming/stored policy SHALL fail startup rather than reset. Initialization commits before listening; later listen failure does not undo an inserted durable row. Feedback validation and original decisions remain preserved.
+
+#### Scenario: Learned durable restart
+- **GIVEN** learned ReviewAt21 and an original20/REVIEW result under seedA
+- **WHEN** database restart supplies different seedB or defaults
+- **THEN** learned policy/feedback identity remain unchanged
+- **AND** replay stays20/REVIEW while a new equivalent attempt scores20/ALLOW.
