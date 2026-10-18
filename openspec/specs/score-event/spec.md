@@ -43,6 +43,15 @@ GET /v1/events/{event_id}/explanation SHALL return the stored decision or 404. G
 - **WHEN** a false-positive label is applied
 - **THEN** ReviewAt remains equal to DenyAt and configuration validates.
 
+### Requirement: Durable transactional repository
+The optional PostgreSQL adapter SHALL atomically retain replay identities, decisions, rule snapshots, velocity timestamps and feedback labels across a database restart. Callback errors SHALL roll back complete updates. This adapter is implemented and parity-tested independently; server DATABASE_URL selection is not yet wired. It loads/writes one full-history JSONB snapshot and makes no scalable-throughput claim.
+
+#### Scenario: Database restart
+- **GIVEN** a scored event and confirmed-fraud feedback committed in PostgreSQL
+- **WHEN** the database is stopped and started using the same data directory
+- **THEN** a newly opened adapter returns the original explanation and learned threshold
+- **AND** replay of feedback does not apply it again.
+
 ### Requirement: Reject invalid JSON
 The service SHALL reject malformed or trailing JSON with HTTP 400.
 

@@ -69,6 +69,9 @@ func (m *MemoryEvents) Update(ctx context.Context, fn func(*EventState) error) e
 	if err := fn(&next); err != nil {
 		return err
 	}
+	if err := next.Rules.Validate(); err != nil {
+		return err
+	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}

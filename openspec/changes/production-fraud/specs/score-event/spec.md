@@ -1,7 +1,7 @@
 ## ADDED Requirements
 
 ### Requirement: Deterministic exact-money scoring
-The service SHALL score submitted events deterministically using exact decimal amount and explicit currency, return a score from 0 through 100, a named decision, and named reasons. The implemented POST /v1/score currently remains a legacy amount-only endpoint; contextual rules and exact-money validation are planned and MUST NOT be represented as implemented until shipped.
+The service SHALL score submitted events deterministically using exact decimal amount and explicit currency, return a score from 0 through 100, a named decision, and named reasons. Exact USD parsing, weighted contextual scoring, internally accumulated account-window velocity and replay-safe memory/Postgres repositories are implemented. PostgreSQL runtime selection, inferred structuring, HTTP operations and measured latency remain pending.
 
 #### Scenario: Replay identity
 - GIVEN a scoring event with an event_id
@@ -11,4 +11,4 @@ The service SHALL score submitted events deterministically using exact decimal a
 #### Scenario: Published endpoint status
 - GIVEN the OpenAPI contract
 - WHEN consumers inspect its routes
-- THEN POST /v1/score is marked implemented and explanation, rules, and feedback routes are marked planned until implemented.
+- THEN POST /v1/score and explanation, rules, and feedback routes are marked implemented with documented compatibility aliases and statuses.
