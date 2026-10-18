@@ -44,7 +44,7 @@ GET /v1/events/{event_id}/explanation SHALL return the stored decision or 404. G
 - **THEN** ReviewAt remains equal to DenyAt and configuration validates.
 
 ### Requirement: Durable transactional repository
-The optional PostgreSQL adapter SHALL atomically retain replay identities, decisions, rule snapshots, velocity timestamps and feedback labels across a database restart. Callback errors SHALL roll back complete updates. This adapter is implemented and parity-tested independently; server DATABASE_URL selection is not yet wired. It loads/writes one full-history JSONB snapshot and makes no scalable-throughput claim.
+The optional PostgreSQL adapter SHALL atomically retain replay identities, decisions, rule snapshots, velocity timestamps and feedback labels across a database restart. Callback errors SHALL roll back complete updates. DATABASE_URL selects this adapter at server startup; unset selects non-durable process memory. It loads/writes one full-history JSONB snapshot and makes no scalable-throughput claim.
 
 #### Scenario: Database restart
 - **GIVEN** a scored event and confirmed-fraud feedback committed in PostgreSQL
@@ -66,3 +66,19 @@ A failed store SHALL NOT produce a successful rules/explanation/feedback respons
 - **GIVEN** a repository returning a synthetic internal error
 - **WHEN** an explanation is requested
 - **THEN** response is 503 unavailable with no internal error detail and a request ID.
+
+### Requirement: Validated bounded runtime
+HTTP_ADDR defaults to :8103 and SHALL name a valid nonzero port. DATABASE_URL SHALL be a PostgreSQL URL when present. REQUEST_TIMEOUT, STARTUP_TIMEOUT and SHUTDOWN_TIMEOUT SHALL be positive durations at most one minute, defaulting to 5s/10s/10s. All routes SHALL have response deadlines; server read/header/write/idle operations SHALL be bounded. Signal cancellation SHALL initiate graceful shutdown with forced close on deadline. Logs SHALL be structured and omit database connection information.
+
+#### Scenario: Native HTTP lifecycle
+- **GIVEN** a server with an injected TCP listener
+- **WHEN** readiness is requested then service context is canceled
+- **THEN** readiness is 200 and serving terminates without synchronization sleeps.
+
+### Requirement: Operational endpoints
+GET /healthz SHALL report process liveness, GET /readyz SHALL probe the selected event store and return 503 when unavailable, and GET /metrics SHALL return process-local requests_total and failures_total (HTTP 5xx) counters.
+
+#### Scenario: Store unavailable
+- **GIVEN** a repository returning an error
+- **WHEN** health and readiness are queried
+- **THEN** health is 200 and readiness is 503.

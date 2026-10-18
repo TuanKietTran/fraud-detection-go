@@ -1,29 +1,27 @@
 package main
 
 import (
-	"log"
-	"net/http"
+	"context"
+	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/TuanKietTran/fraud-detection-go/internal/api"
-	"github.com/TuanKietTran/fraud-detection-go/internal/query"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	"github.com/TuanKietTran/fraud-detection-go/internal/service"
 )
 
 func main() {
-	scoreH := query.NewScoreEventHandler()
-	handlers := api.NewHandlers(scoreH)
-
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Mount("/v1", handlers.Routes())
-
-	addr := os.Getenv("HTTP_ADDR")
-	if addr == "" {
-		addr = ":8103"
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+	config, err := service.LoadConfig(os.Getenv)
+	if err != nil {
+		logger.Error("invalid configuration", "error", err.Error())
+		os.Exit(1)
 	}
-	log.Println("Fraud Detection API listening on " + addr)
-	log.Fatal(http.ListenAndServe(addr, r))
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := service.Run(ctx, config, logger); err != nil {
+		logger.Error("server stopped", "error", err.Error())
+		os.Exit(1)
+	}
 }

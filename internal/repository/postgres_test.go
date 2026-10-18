@@ -16,6 +16,7 @@ import (
 	"github.com/TuanKietTran/fraud-detection-go/internal/domain"
 	"github.com/TuanKietTran/fraud-detection-go/internal/query"
 	"github.com/TuanKietTran/fraud-detection-go/internal/repository"
+	"github.com/TuanKietTran/fraud-detection-go/internal/service"
 	embeddedpostgres "github.com/fergusstrange/embedded-postgres"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -174,6 +175,24 @@ func TestPostgresEventParity(t *testing.T) {
 	if h.Rules().ReviewAt != 39 {
 		t.Fatal("database restart lost feedback identity")
 	}
+	runtimeConfig, err := service.LoadConfig(func(key string) string {
+		if key == "DATABASE_URL" {
+			return config.GetConnectionURL()
+		}
+		return ""
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, closeSelected, err := service.OpenStore(ctx, runtimeConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtimeHandler, _ := query.NewScoreEventHandlerWithStore(selected, time.Now, time.Minute)
+	if runtimeHandler.Rules().ReviewAt != 39 {
+		t.Fatal("DATABASE_URL did not select durable state")
+	}
+	closeSelected()
 	if _, err := repository.NewPostgresEvents(ctx, nil, rules); err == nil {
 		t.Fatal("nil pool accepted")
 	}

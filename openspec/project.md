@@ -1,6 +1,6 @@
 # Fraud detection
 
-Exact-money weighted scoring with transactional process-memory replay, explanations, feedback and account-window velocity. PostgreSQL persistence and operational hardening remain unfinished.
+Exact-money weighted scoring with transactional process-memory replay, explanations, feedback and account-window velocity. Optional PostgreSQL persistence and bounded operational runtime are implemented; scalability, inferred structuring and measured latency remain unfinished.
 
 ## Stack
 
@@ -29,10 +29,14 @@ Authoritative schemas and compatibility aliases: `api/openapi.yaml`.
 
 Starting commit `3320761`; `GOTOOLCHAIN=local FRAUD_POSTGRES_CACHE=<cache> go test -p 2 ./... -race -count=1 -coverprofile=<profile>`: API 95.0%, domain 91.9%, query 95.6%, repository 88.9%, playback 61.5%; weighted non-cmd 325/367 = 88.56%. Build/vet/tidy/format pass. Exact commit hash and full log path in STATUS-fraud.md.
 
+## Runtime operations checkpoint
+
+Starting commit `4293c22`; native `GOTOOLCHAIN=local FRAUD_POSTGRES_CACHE=<cache> go test -p 2 ./... -race -count=1 -coverprofile=<profile>` passes with real PostgreSQL DATABASE_URL selection. Domain 91.9%, API 95.0%, query 95.6%, repository 88.9%, service 90.9%, playback 61.5%; weighted non-cmd 445/499 = 89.18%. Build/vet/tidy/format pass; `ctl/logs/fraud/card5b-gates.log`; card commit hash in append-only STATUS.
+
 ## Pending mandatory work
 
-- Server-selected PostgreSQL repository and configuration updates (adapter/parity test implemented separately; server still defaults to process memory).
-- Runtime readiness/metrics, structured access logs, validated env and server lifecycle/timeouts (JSON errors/request IDs/body limits/panic containment implemented).
+- Rule configuration updates beyond validated injected policies and deterministic feedback learning.
+- Measured memory latency/scoped transaction optimization, hiring-manager README and CI/DoD completion.
 - Inferred structuring patterns (current contextual flag is supplied), measured p99 and operational docs.
 
 ## Native macOS continuation checkpoint

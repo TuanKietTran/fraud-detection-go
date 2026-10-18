@@ -6,11 +6,32 @@ info:
 servers:
   - url: http://localhost:8103
 paths:
+  /healthz:
+    get:
+      summary: Process liveness
+      responses:
+        '200': {description: Process is serving}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /readyz:
+    get:
+      summary: Readiness probes the selected event repository
+      responses:
+        '200': {description: Event store is ready}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /metrics:
+    get:
+      summary: JSON counters requests_total and failures_total (HTTP 5xx)
+      responses:
+        '200': {description: Process-local counters including the metrics request}
+        '500': {$ref: '#/components/responses/InternalError'}
+        '503': {$ref: '#/components/responses/Unavailable'}
   /v1/score:
     post:
       operationId: scoreEvent
       summary: Score a synthetic transaction event (implemented)
-      description: Runtime listens at HTTP_ADDR (default :8103). Exact decimal amount is parsed directly from JSON text. In-process replay returns identical results for identical event_id/payload and rejects changed payloads. Velocity counts prior unique account events in the last 60 seconds (exclusive lower boundary); replay never increments it. Legacy recent_count can raise but cannot lower the internal count. State remains process-memory only.
+      description: Runtime listens at HTTP_ADDR (default :8103). DATABASE_URL selects durable PostgreSQL state; unset uses process-memory state. REQUEST_TIMEOUT defaults to 5s, STARTUP_TIMEOUT and SHUTDOWN_TIMEOUT to 10s (all positive, at most 1m). Exact decimal amount is parsed directly from JSON text. In-process replay returns identical results for identical event_id/payload and rejects changed payloads. Velocity counts prior unique account events in the last 60 seconds (exclusive lower boundary); replay never increments it. Legacy recent_count can raise but cannot lower the internal count. Memory state is lost at restart; PostgreSQL state is retained but serialized as one full-history snapshot.
       requestBody:
         required: true
         content:
@@ -31,7 +52,7 @@ paths:
   /v1/events/{event_id}/explanation:
     get:
       operationId: getExplanation
-      summary: Get in-memory scoring explanation (implemented)
+      summary: Get stored scoring explanation (implemented)
       parameters:
         - {in: path, name: event_id, required: true, schema: {type: string}}
       responses:
@@ -52,7 +73,7 @@ paths:
   /v1/feedback:
     post:
       operationId: submitFeedback
-      summary: Submit a feedback label (implemented, in-memory deterministic threshold adjustment)
+      summary: Submit a feedback label (implemented, deterministic threshold adjustment)
       requestBody:
         required: true
         content:
@@ -93,7 +114,7 @@ components:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
     Unavailable:
-      description: Scoring repository unavailable.
+      description: Scoring repository unavailable or bounded server response deadline exceeded (retry with the original event identity).
       content:
         application/json:
           schema: {$ref: '#/components/schemas/Error'}
