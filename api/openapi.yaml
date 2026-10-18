@@ -9,7 +9,7 @@ paths:
     post:
       operationId: scoreEvent
       summary: Score a synthetic transaction event (implemented)
-      description: Runtime listens at HTTP_ADDR (default :8103). Exact decimal amount is parsed directly from JSON text. In-process replay returns identical results for identical event_id/payload and rejects changed payloads. recent_count is caller-supplied; velocity is not internally accumulated.
+      description: Runtime listens at HTTP_ADDR (default :8103). Exact decimal amount is parsed directly from JSON text. In-process replay returns identical results for identical event_id/payload and rejects changed payloads. Velocity counts prior unique account events in the last 60 seconds (exclusive lower boundary); replay never increments it. Legacy recent_count can raise but cannot lower the internal count. State remains process-memory only.
       requestBody:
         required: true
         content:
@@ -63,7 +63,7 @@ components:
           pattern: '^(0|[1-9][0-9]*)(\.[0-9]{1,2})?$'
           description: Exact decimal amount; USD scale 2. Transitional numeric JSON tokens are parsed directly as decimal text.
         currency: {type: string, enum: [USD]}
-        recent_count: {type: integer, minimum: 0, description: Caller-provided count; not accumulated internally.}
+        recent_count: {type: integer, minimum: 0, description: Legacy caller signal; effective velocity is the maximum of this and the internally accumulated account count.}
         geo_mismatch: {type: boolean}
         device_mismatch: {type: boolean}
         new_payee: {type: boolean}

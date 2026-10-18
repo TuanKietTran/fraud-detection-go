@@ -2,56 +2,50 @@
 
 ## Purpose
 
-Turn an event amount into a score, a decision, and reason codes. The HTTP response is the whole result; this route does not store it.
+Score synthetic USD events with exact integer cents, validated weighted rules and replay-safe process-lifetime explanations.
 
 ## Requirements
 
-### Requirement: Allow a small amount
-The system SHALL allow an event whose amount is 5000 or less, with score 0 and no reason codes.
+### Requirement: Exact weighted scoring
+The service SHALL parse decimal strings (and transitional raw numeric tokens without floats), support USD with at most two fractional digits, and reject negative or overflowing amounts. Defaults add 40/HIGH_AMOUNT above 5000 and a further 30/VERY_HIGH_AMOUNT above 10000. Contextual rules add bounded weights for velocity, geo/device mismatch, new payee and supplied structuring within the configured amount band. Scores SHALL be capped at 100, with ALLOW below 40, REVIEW below 70 and DENY otherwise. POST /v1/score retains BLOCK as the documented legacy alias of DENY.
 
-#### Scenario: Amount at the allow boundary
-- **WHEN** a client posts `event_id`, `account`, and amount 5000
-- **THEN** the response is HTTP 200
-- **AND** `Score` is 0
-- **AND** `Decision` is `ALLOW`
-- **AND** `ReasonCodes` is empty
-- **AND** `EventID` is the posted event id
+#### Scenario: Amount boundaries
+- **GIVEN** default rules and no contextual signals or prior account events
+- **WHEN** 5000.00, 5000.01, 10000.00 and 10000.01 are scored
+- **THEN** scores are respectively 0, 40, 40 and 70.
 
-### Requirement: Review a high amount
-The system SHALL add 40 and reason `HIGH_AMOUNT` when the amount is greater than 5000, and SHALL return `REVIEW` when the score is at least 40 and below 70.
+### Requirement: Persist replay-safe scoring decisions
+The service SHALL atomically record input, decision, timestamp, effective recent count and rule snapshot. Identical replay SHALL return the original decision; changed payload SHALL be rejected (legacy HTTP 400). The memory adapter is not durable across process restart.
 
-#### Scenario: Amount just over 5000
-- **WHEN** the amount is greater than 5000 and not greater than 10000
-- **THEN** `Score` is 40
-- **AND** `Decision` is `REVIEW`
-- **AND** `ReasonCodes` is `HIGH_AMOUNT`
+#### Scenario: Replay after feedback or window expiry
+- **GIVEN** an event already scored
+- **WHEN** its exact input is replayed after rules or the clock change
+- **THEN** the original decision and reasons are returned without adding another velocity event.
 
-#### Scenario: Amount equal to 10000
-- **WHEN** the amount is 10000
-- **THEN** `Score` is 40
-- **AND** `Decision` is `REVIEW`
-- **AND** `ReasonCodes` contains `HIGH_AMOUNT` and does not contain `VERY_HIGH_AMOUNT`
+### Requirement: Account-window velocity
+The service SHALL count prior unique events for the same account in (now-60s, now], using an injected clock. Legacy recent_count SHALL only increase the effective count.
 
-### Requirement: Block a very high amount
-The system SHALL add a further 30 and reason `VERY_HIGH_AMOUNT` when the amount is greater than 10000, and SHALL return `BLOCK` when the score is at least 70.
+#### Scenario: Concurrent unique events
+- **GIVEN** multiple handlers sharing a repository and a velocity limit of one
+- **WHEN** distinct events for the same account are scored concurrently at the same time
+- **THEN** only one event is scored without velocity weight.
 
-#### Scenario: Amount just over 10000
-- **WHEN** the amount is greater than 10000
-- **THEN** `Score` is 70
-- **AND** `Decision` is `BLOCK`
-- **AND** `ReasonCodes` contains `HIGH_AMOUNT` and `VERY_HIGH_AMOUNT`
+#### Scenario: Account isolation and time boundaries
+- **GIVEN** events for another account, expired events at exactly now-60s, or future events after clock rollback
+- **WHEN** a new event is scored
+- **THEN** those events are excluded from velocity.
 
-### Requirement: Do not persist the score
-The system SHALL NOT write the decision as part of `POST /v1/score`.
+### Requirement: Explanation, configuration and feedback
+GET /v1/events/{event_id}/explanation SHALL return the stored decision or 404. GET /v1/rules SHALL return active configuration. POST /v1/feedback SHALL accept CONFIRMED_FRAUD or FALSE_POSITIVE for an existing event, adjust ReviewAt by minus/plus one bounded by [1,DenyAt], replay the same label without another change, and reject conflicting labels.
 
-#### Scenario: Score then nothing to read
-- **WHEN** a client scores an event
-- **THEN** the only result is the HTTP body
-- **AND** the API exposes no route that returns that decision later
+#### Scenario: Feedback does not invalidate thresholds
+- **GIVEN** ReviewAt equals DenyAt
+- **WHEN** a false-positive label is applied
+- **THEN** ReviewAt remains equal to DenyAt and configuration validates.
 
 ### Requirement: Reject invalid JSON
-The system SHALL reject a body that is not JSON.
+The service SHALL reject malformed or trailing JSON with HTTP 400.
 
 #### Scenario: Not JSON
-- **WHEN** the body is not JSON
-- **THEN** the response is HTTP 400 and the body contains `invalid json`
+- **WHEN** a score body is not JSON
+- **THEN** the response is HTTP 400.

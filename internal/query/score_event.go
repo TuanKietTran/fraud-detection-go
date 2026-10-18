@@ -3,89 +3,129 @@ package query
 import (
 	"context"
 	"errors"
-	"sync"
+	"time"
 
 	"github.com/TuanKietTran/fraud-detection-go/internal/domain"
+	"github.com/TuanKietTran/fraud-detection-go/internal/repository"
 )
 
-type ScoreEventQuery struct {
-	EventID                                            string
-	AmountCents                                        int64
-	Account                                            string
-	RecentCount                                        int
-	GeoMismatch, DeviceMismatch, NewPayee, Structuring bool
-}
-type replayRecord struct {
-	query  ScoreEventQuery
-	result domain.RiskDecision
-}
+type ScoreEventQuery = repository.EventInput
+
 type ScoreEventHandler struct {
-	mu       sync.Mutex
-	replay   map[string]replayRecord
-	config   domain.RuleConfig
-	feedback map[string]string
+	store  repository.EventStore
+	now    func() time.Time
+	window time.Duration
 }
 
 func NewScoreEventHandler() *ScoreEventHandler {
 	return NewScoreEventHandlerWithConfig(domain.DefaultRuleConfig())
 }
 func NewScoreEventHandlerWithConfig(c domain.RuleConfig) *ScoreEventHandler {
-	return &ScoreEventHandler{replay: make(map[string]replayRecord), config: c, feedback: make(map[string]string)}
+	h, err := NewScoreEventHandlerWithStore(repository.NewMemoryEvents(c), time.Now, time.Minute)
+	if err != nil {
+		panic(err)
+	}
+	return h
 }
+
+// NewScoreEventHandlerWithStore supports shared repositories and deterministic clocks.
+// Velocity counts prior unique events in (now-window, now], for the same account.
+func NewScoreEventHandlerWithStore(store repository.EventStore, now func() time.Time, window time.Duration) (*ScoreEventHandler, error) {
+	if store == nil || now == nil || window <= 0 {
+		return nil, errors.New("store, clock and positive velocity window required")
+	}
+	return &ScoreEventHandler{store: store, now: now, window: window}, nil
+}
+
+func cloneDecision(d domain.RiskDecision) domain.RiskDecision {
+	d.ReasonCodes = append([]string{}, d.ReasonCodes...)
+	return d
+}
+
 func (h *ScoreEventHandler) Rules() domain.RuleConfig {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	return h.config
+	rules, _ := h.LoadRules(context.Background())
+	return rules
+}
+func (h *ScoreEventHandler) LoadRules(ctx context.Context) (domain.RuleConfig, error) {
+	var rules domain.RuleConfig
+	err := h.store.Update(ctx, func(s *repository.EventState) error { rules = s.Rules; return nil })
+	return rules, err
 }
 func (h *ScoreEventHandler) Explain(eventID string) (domain.RiskDecision, bool) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	r, ok := h.replay[eventID]
-	return r.result, ok
+	result, ok, _ := h.ExplainContext(context.Background(), eventID)
+	return result, ok
+}
+func (h *ScoreEventHandler) ExplainContext(ctx context.Context, eventID string) (domain.RiskDecision, bool, error) {
+	var result domain.RiskDecision
+	var ok bool
+	err := h.store.Update(ctx, func(s *repository.EventState) error {
+		record, found := s.Events[eventID]
+		ok = found
+		result = cloneDecision(record.Result)
+		return nil
+	})
+	return result, ok, err
 }
 func (h *ScoreEventHandler) Feedback(eventID, label string) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if _, ok := h.replay[eventID]; !ok {
-		return errors.New("event not found")
-	}
-	if label != "CONFIRMED_FRAUD" && label != "FALSE_POSITIVE" {
-		return errors.New("invalid feedback label")
-	}
-	if old, ok := h.feedback[eventID]; ok {
-		if old == label {
-			return nil
+	return h.FeedbackContext(context.Background(), eventID, label)
+}
+func (h *ScoreEventHandler) FeedbackContext(ctx context.Context, eventID, label string) error {
+	return h.store.Update(ctx, func(s *repository.EventState) error {
+		if _, ok := s.Events[eventID]; !ok {
+			return errors.New("event not found")
 		}
-		return errors.New("feedback conflict")
-	}
-	h.feedback[eventID] = label
-	if label == "CONFIRMED_FRAUD" && h.config.ReviewAt > 1 {
-		h.config.ReviewAt--
-	} else if label == "FALSE_POSITIVE" && h.config.ReviewAt < 100 {
-		h.config.ReviewAt++
-	}
-	return nil
+		if label != "CONFIRMED_FRAUD" && label != "FALSE_POSITIVE" {
+			return errors.New("invalid feedback label")
+		}
+		if old, ok := s.Feedback[eventID]; ok {
+			if old == label {
+				return nil
+			}
+			return errors.New("feedback conflict")
+		}
+		s.Feedback[eventID] = label
+		if label == "CONFIRMED_FRAUD" && s.Rules.ReviewAt > 1 {
+			s.Rules.ReviewAt--
+		} else if label == "FALSE_POSITIVE" && s.Rules.ReviewAt < s.Rules.DenyAt {
+			s.Rules.ReviewAt++
+		}
+		return nil
+	})
 }
 func (h *ScoreEventHandler) Handle(ctx context.Context, q ScoreEventQuery) (domain.RiskDecision, error) {
 	if err := ctx.Err(); err != nil {
 		return domain.RiskDecision{}, err
 	}
-	if q.EventID == "" || q.Account == "" || q.AmountCents < 0 {
-		return domain.RiskDecision{}, errors.New("event_id, account and nonnegative amount required")
+	if q.EventID == "" || q.Account == "" || q.AmountCents < 0 || q.RecentCount < 0 {
+		return domain.RiskDecision{}, errors.New("event_id, account and nonnegative amount/count required")
 	}
-	h.mu.Lock()
-	defer h.mu.Unlock()
-	if old, ok := h.replay[q.EventID]; ok {
-		if old.query != q {
-			return domain.RiskDecision{}, errors.New("event_id replay payload conflict")
+	var result domain.RiskDecision
+	err := h.store.Update(ctx, func(s *repository.EventState) error {
+		if old, ok := s.Events[q.EventID]; ok {
+			if old.Input != q {
+				return errors.New("event_id replay payload conflict")
+			}
+			result = cloneDecision(old.Result)
+			return nil
 		}
-		return old.result, nil
-	}
-	score, decision, reasons, err := domain.ScoreWithRules(domain.Signals{AmountCents: q.AmountCents, RecentCount: q.RecentCount, GeoMismatch: q.GeoMismatch, DeviceMismatch: q.DeviceMismatch, NewPayee: q.NewPayee, Structuring: q.Structuring}, h.config)
-	if err != nil {
-		return domain.RiskDecision{}, err
-	}
-	result := domain.RiskDecision{EventID: q.EventID, Score: score, Decision: decision, ReasonCodes: reasons}
-	h.replay[q.EventID] = replayRecord{query: q, result: result}
-	return result, nil
+		now := h.now().UTC()
+		recent := 0
+		for _, record := range s.Events {
+			if record.Input.Account == q.Account && record.RecordedAt.After(now.Add(-h.window)) && !record.RecordedAt.After(now) {
+				recent++
+			}
+		}
+		// Preserve the published legacy signal, but clients cannot lower our count.
+		if q.RecentCount > recent {
+			recent = q.RecentCount
+		}
+		score, decision, reasons, err := domain.ScoreWithRules(domain.Signals{AmountCents: q.AmountCents, RecentCount: recent, GeoMismatch: q.GeoMismatch, DeviceMismatch: q.DeviceMismatch, NewPayee: q.NewPayee, Structuring: q.Structuring}, s.Rules)
+		if err != nil {
+			return err
+		}
+		result = domain.RiskDecision{EventID: q.EventID, Score: score, Decision: decision, ReasonCodes: reasons}
+		s.Events[q.EventID] = repository.EventRecord{Input: q, Result: cloneDecision(result), RecordedAt: now, RecentCount: recent, Rules: s.Rules}
+		return nil
+	})
+	return result, err
 }
