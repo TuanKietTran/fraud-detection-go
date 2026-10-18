@@ -13,7 +13,8 @@
 
 - [ ] Runtime policy editing beyond injected RuleConfig and deterministic feedback (no API/env yet; route contract expansion through manager).
 - [ ] Scalable relational SQL and bounded account-history retention/time indexing (current durable snapshot is correctness-first).
-- [ ] Complete success schemas and semantic contract validation for explanation/rules.
+- [x] Complete explanation/rules success schemas and targeted response shape/reference checks for every existing v1 status.
+- [ ] Full semantic OpenAPI/request-schema validation beyond the explicitly supported response subset.
 - [ ] Cold-clone under-two-minute timing and hosted workflow execution evidence.
 - [ ] Manager-owned real-process S1/10k fault/reconciliation evidence, not inferred from this service's microtiming/playback.
 

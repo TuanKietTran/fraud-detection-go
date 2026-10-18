@@ -4,6 +4,8 @@
 
 Evidence baseline: `97c4c98`, native Go1.27.1 darwin/arm64, 2026-10-18; full race run `ctl/logs/fraud/card5c-gates.log`, profile `card5c.cover`, cover-function report `card5c-cover-func.log`. These control-directory artifacts are local lab evidence; commands in README regenerate them. Docker, CI execution and production deployment are not verified.
 
+Response-contract follow-up, 2026-10-19 (parent `9132b35`): full resumed native gates pass in `ctl/logs/fraud/card7-resumed-gates.log` / `card7.cover`; API96.0%, weighted non-cmd505/558=90.50%, domain70/76=92.11%. Other package percentages unchanged; actual PostgreSQL suite86.635s, no skips. New response-contract tests named below are verified by this run, not inferred from the earlier baseline.
+
 ## Met
 
 | Acceptance | Exact test / evidence |
@@ -23,7 +25,9 @@ Evidence baseline: `97c4c98`, native Go1.27.1 darwin/arm64, 2026-10-18; full rac
 | Operational fallback/panic JSON contains matching request ID | `service.TestOperationalPanicIsContained`, `service.TestOperationalFallbackErrorsAreJSON` |
 | Real listener graceful cancellation and serve/listen/startup failures | `service.TestServeRealListenerGracefulCancellationAndServeFailure`, `service.TestRunStartupAndListenFailuresAreBoundedAndSanitized` |
 | Safe retry after local write commits but HTTP response is canceled | `service.TestRetryAfterCommittedButCanceledHTTPResponse`, memory fault wrapper/channel synchronization; not a real-process SQL crash drill |
-| Published route/status sets are parsed and exercised | `api.TestOpenAPIParsedRoutesAndStatuses`, `service.TestOperationalRoutesMetricsAndUnavailableReadiness`, related error-path tables; not a full OpenAPI semantic/schema validator |
+| Published route/status sets are parsed and exercised | `api.TestOpenAPIParsedRoutesAndStatuses`, `service.TestOperationalRoutesMetricsAndUnavailableReadiness`, related error-path tables |
+| Existing v1 success/error bodies match declared response shapes | `api.TestV1ResponsesMatchParsedSchemasForEveryDeclaredStatus` exercises every declared v1 status, all reason enums, canonical explanation DENY versus score BLOCK, empty feedback202, request-ID equality and learned policy |
+| Exact PascalCase policy integer serialization and negative contract drift detection | `api.TestRuleConfigSchemaMatchesExtremeExactIntegerSerialization`, `TestResponseSchemaChecksRejectPayloadDrift`, `TestPublishedResponseReferencesAndSchemaDefinitionsResolve`; int64-max amount configuration is preserved without floats |
 | Preserved playback regression:1000 score calls, one503 retry each, exact replay | `playback.TestThousandPerMinuteAndPlayback`; HTTP httptest, not separate service processes or S1 |
 | Client400 not retried; transient503 retried with bounded attempts | `playback.TestDoesNotRetryClientError`, `TestRetriesTransientFailure`, `TestStopsAfterMaxAttempts`; playback helper only, not a downstream production client |
 | Domain>=90%, weighted non-cmd>=80%, race clean | Recorded domain92.1%, weighted504/558=90.32%; API95.0/query95.9/repository93.5/service90.9/playback61.5. `scripts.TestCoverageGateUsesWeightedStatementsAndDomainThreshold` asserts the new gate's weighting/thresholds/excluded cmd behavior |
@@ -35,7 +39,7 @@ Evidence baseline: `97c4c98`, native Go1.27.1 darwin/arm64, 2026-10-18; full rac
 | --- | --- |
 | Configurable validated policy | Domain accepts injected RuleConfig and deterministic feedback adjusts ReviewAt; executable seeds defaults. Runtime rule-edit API/policy env is not exposed. GET rules uses PascalCase exported field names. |
 | Scalable durable repository | SQL durability/parity proven, but singleton JSONB loads full history and serializes readers/writers. No relational per-event/account-time indexing or retention. Memory scoped account history is also unbounded. |
-| HTTP contract completeness | Actual route/status/error families covered, but success explanation/rules schemas are not fully specified/validated and status tests are not a comprehensive OpenAPI validator. |
+| Full semantic OpenAPI validation | Explanation/rules success schemas and targeted v1 response-shape checks are implemented. The helper supports objects/arrays/strings/exact integer text, enums, required/extra properties, min/max/minLength and local references. It is not a full request/schema validator (patterns, general formats, cross-field relations and arbitrary OpenAPI composition are not verified). |
 | Under-two-minute clean-clone run | Minimal Go-only memory instructions supplied; cold download/clean-clone wall time is not measured. Local warm-cache compiled-process smoke checked12 HTTP operations and SIGTERM exit0 (`ctl/logs/fraud/card6-gates.log`); this is not a cold-clone claim. |
 | All error/shutdown branches and domain invariants exhaustively covered | Measured domain92.1%, service90.9%, not100%; no claim of exhaustive branch/property coverage. |
 | Hiring-manager documentation / CI | README, diagram, curl, glossary, ADRs and measured report supplied; workflow and weighted gate specified/tested locally, but hosted workflow remains UNVERIFIED: not run. |

@@ -122,3 +122,24 @@ Documentation SHALL distinguish measured memory application latency, httptest pl
 - **GIVEN** workflow parsing and gate tests pass locally
 - **WHEN** documentation describes CI
 - **THEN** hosted execution remains UNVERIFIED until it actually runs.
+
+### Requirement: Explicit existing success response schemas
+GET explanation200 SHALL declare the original stored event_id, bounded score, canonical ALLOW/REVIEW/DENY decision and named reasons. POST score SHALL retain documented BLOCK compatibility. GET rules200 SHALL declare every existing PascalCase RuleConfig field as a required integer with applicable bounds and exact int64 monetary serialization. Feedback202 SHALL declare an empty body. No runtime policy-edit surface is implied.
+
+#### Scenario: Denial explanation
+- **GIVEN** a default high-amount event scored as BLOCK on POST
+- **WHEN** its explanation is fetched
+- **THEN** the stored decision is DENY and both responses satisfy their schemas.
+
+#### Scenario: Learned and extreme policy values
+- **GIVEN** valid injected int64-max thresholds or a feedback-adjusted ReviewAt
+- **WHEN** GET rules is called
+- **THEN** PascalCase fields remain exact integers and satisfy the declared shape.
+
+### Requirement: Parsed response-contract regression checks
+Tests SHALL resolve published response references/schema definitions and exercise every declared v1 operation/status against real handlers. Checks SHALL include JSON media type, required/extra fields, string/array/exact integer types, enums, applicable bounds and error/header request-ID equality. Negative mutations SHALL prove rejection. This is a targeted response subset, not a full semantic OpenAPI/request validator.
+
+#### Scenario: Response drift
+- **GIVEN** a missing/wrong/extra field, invalid bounds/integer/enum or dangling reference
+- **WHEN** response contract checks run
+- **THEN** the defect is rejected.

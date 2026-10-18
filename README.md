@@ -60,7 +60,7 @@ CQRS-inspired layering, **not** separate read/write databases or independent rea
 - Default amount weights: over USD 5,000 adds 40; over USD 10,000 adds another 30. Default score bands: ALLOW below 40, REVIEW 40–69, DENY 70–100; score is capped at 100. These assume no additional signals/history and no learned threshold changes.
 - Other named weights: ACCOUNT_VELOCITY 25 after five prior attempts, GEO_MISMATCH 20, DEVICE_MISMATCH 15, NEW_PAYEE 15, STRUCTURING 20. History counts unique scored attempts, including denials, in **(now-60s, now]**, per account; future timestamps after clock rollback do not count. Legacy `recent_count` may raise, never lower, the internal count.
 - Structuring is inferred on the third same-account attempt when it and two prior amounts are within the inclusive top 10% of the configured band (default USD 900–1,000). The legacy supplied flag remains additive; false cannot suppress inference. This is a named synthetic heuristic, not a real-world compliance model.
-- POST score emits **BLOCK**, the legacy alias of domain DENY; explanations return canonical DENY. Consumers must accept both. Score/explanation envelopes are snake_case; GET rules currently exposes Go `RuleConfig` field names in PascalCase.
+- POST score emits **BLOCK**, the legacy alias of domain DENY; explanations return canonical DENY. Consumers must accept both. Score/explanation envelopes are snake_case; GET rules exposes all existing Go `RuleConfig` fields in PascalCase, with an explicit integer schema. Feedback202 has an empty body. Parsed tests exercise every declared v1 status against response schemas, including exact int64 policy serialization; this is a targeted response-checking subset, not a full OpenAPI/request validator.
 - CONFIRMED_FRAUD lowers ReviewAt by one, FALSE_POSITIVE raises it by one, bounded by `[1,DenyAt]`. Existing decisions never change. Rule weights/thresholds can be injected through validated Go `RuleConfig`; the executable seeds defaults. There is **no runtime rule-edit API or rule-policy environment variable**. Feedback changes only ReviewAt.
 
 ## Configuration and persistence
@@ -109,6 +109,8 @@ Measured 2026-10-18 at `97c4c98`, Go 1.27.1 darwin/arm64, Apple M1 / 16 GiB:
 | Structuring fuzz,2s | 145,053 executions; no failure |
 | Memory application handler,10k unique isolated accounts | p50/p95/p99=1291/3292/5459ns |
 | Exact replay cohort,10k calls | p50/p95/p99=1334/2750/4209ns |
+
+The response-contract follow-up (2026-10-19, parent `9132b35`) passed the full race suite with API96.0% and weighted non-cmd505/558=90.50%; other package percentages were unchanged. Evidence: `ctl/logs/fraud/card7-resumed-gates.log` / `card7.cover`. Timing was not rerun; the table above retains its original measurement scope/date.
 
 Timing excludes HTTP/network, caller payload construction and SQL. Both measured memory p99 values are below the 5ms in-process target; **this is not real-process10k S1 proof**. See [method/raw-evidence location](docs/performance.md), [acceptance status](openspec/dod.md), [glossary](docs/glossary.md) and [ADRs](docs/adr/). Immutable replay, exact money, scope rollback, concurrent velocity, inferred patterns and ambiguous-after-commit retries are the demonstrated engineering properties—not model accuracy or production certification.
 

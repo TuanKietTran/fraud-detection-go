@@ -56,7 +56,11 @@ paths:
       parameters:
         - {in: path, name: event_id, required: true, schema: {type: string}}
       responses:
-        '200': {description: Scored event and named reasons}
+        '200':
+          description: Original stored decision and named reasons; DENY is canonical here (POST score retains the BLOCK alias).
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExplanationResponse'}
         '404': {$ref: '#/components/responses/NotFound'}
         '408': {$ref: '#/components/responses/Timeout'}
         '500': {$ref: '#/components/responses/InternalError'}
@@ -64,9 +68,13 @@ paths:
   /v1/rules:
     get:
       operationId: getRules
-      summary: Get active default rule configuration (implemented)
+      summary: Get active rule configuration (implemented, including learned ReviewAt)
       responses:
-        '200': {description: Current active rules}
+        '200':
+          description: Current active rules. Existing PascalCase field names are retained; this is a read-only surface, not a rule-edit API.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/RuleConfig'}
         '408': {$ref: '#/components/responses/Timeout'}
         '500': {$ref: '#/components/responses/InternalError'}
         '503': {$ref: '#/components/responses/Unavailable'}
@@ -80,7 +88,7 @@ paths:
           application/json:
             schema: {$ref: '#/components/schemas/FeedbackRequest'}
       responses:
-        '202': {description: Feedback applied}
+        '202': {description: Feedback applied or identical label replayed; response body is empty.}
         '400': {$ref: '#/components/responses/InvalidRequest'}
         '408': {$ref: '#/components/responses/Timeout'}
         '413': {$ref: '#/components/responses/TooLarge'}
@@ -121,15 +129,17 @@ components:
   schemas:
     Error:
       type: object
+      additionalProperties: false
       required: [error, request_id]
       properties:
-        request_id: {type: string, description: Server-generated identifier also returned in X-Request-ID.}
+        request_id: {type: string, minLength: 1, description: Server-generated identifier also returned in X-Request-ID.}
         error:
           type: object
+          additionalProperties: false
           required: [code, message]
           properties:
-            code: {type: string}
-            message: {type: string}
+            code: {type: string, minLength: 1}
+            message: {type: string, minLength: 1}
     ScoreRequest:
       type: object
       required: [event_id, account, amount, currency]
@@ -148,12 +158,46 @@ components:
         structuring: {type: boolean, description: 'Legacy additive signal. Independently, the third unique same-account event in the active window is inferred as structuring when it and at least two prior amounts lie within the inclusive top 10% of StructuringBandCents. False cannot suppress inference.'}
     ScoreResponse:
       type: object
+      additionalProperties: false
       required: [event_id, score, decision, reasons]
       properties:
-        event_id: {type: string}
+        event_id: {type: string, minLength: 1}
         score: {type: integer, minimum: 0, maximum: 100}
         decision: {type: string, enum: [ALLOW, REVIEW, DENY, BLOCK]}
-        reasons: {type: array, items: {type: string}}
+        reasons: {$ref: '#/components/schemas/Reasons'}
+    ExplanationResponse:
+      type: object
+      additionalProperties: false
+      required: [event_id, score, decision, reasons]
+      properties:
+        event_id: {type: string, minLength: 1}
+        score: {type: integer, minimum: 0, maximum: 100}
+        decision: {type: string, enum: [ALLOW, REVIEW, DENY]}
+        reasons: {$ref: '#/components/schemas/Reasons'}
+    Reasons:
+      type: array
+      items:
+        type: string
+        enum: [HIGH_AMOUNT, VERY_HIGH_AMOUNT, ACCOUNT_VELOCITY, GEO_MISMATCH, DEVICE_MISMATCH, NEW_PAYEE, STRUCTURING]
+    RuleConfig:
+      type: object
+      additionalProperties: false
+      description: Existing PascalCase serialization. ReviewAt must be <=DenyAt and VeryHighAmountCents >=HighAmountCents; these cross-field invariants are enforced by domain validation. Executable seeds defaults; feedback changes only ReviewAt.
+      required: [ReviewAt, DenyAt, HighAmountCents, VeryHighAmountCents, HighAmountWeight, VeryHighAmountWeight, VelocityLimit, VelocityWeight, GeoMismatchWeight, DeviceMismatchWeight, NewPayeeWeight, StructuringWeight, StructuringBandCents]
+      properties:
+        ReviewAt: {type: integer, minimum: 1, maximum: 100}
+        DenyAt: {type: integer, minimum: 1, maximum: 100}
+        HighAmountCents: {type: integer, format: int64, minimum: 0}
+        VeryHighAmountCents: {type: integer, format: int64, minimum: 0}
+        HighAmountWeight: {type: integer, minimum: 0, maximum: 100}
+        VeryHighAmountWeight: {type: integer, minimum: 0, maximum: 100}
+        VelocityLimit: {type: integer, minimum: 1}
+        VelocityWeight: {type: integer, minimum: 0, maximum: 100}
+        GeoMismatchWeight: {type: integer, minimum: 0, maximum: 100}
+        DeviceMismatchWeight: {type: integer, minimum: 0, maximum: 100}
+        NewPayeeWeight: {type: integer, minimum: 0, maximum: 100}
+        StructuringWeight: {type: integer, minimum: 0, maximum: 100}
+        StructuringBandCents: {type: integer, format: int64, minimum: 1}
     FeedbackRequest:
       type: object
       required: [event_id, label]

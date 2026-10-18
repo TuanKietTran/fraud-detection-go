@@ -30,7 +30,11 @@ Commands verify the named capability at the current tree; hashes identify its mi
 | 2026-10-18 | Runtime and DATABASE_URL selection, `26757f9` | `go test ./internal/service ./internal/repository -race -count=1`; real listener/shutdown and persisted runtime selection; recorded weighted89.18% |
 | 2026-10-18 | Inferred structuring/scoped memory/retry ambiguity, `97c4c98` | `go test -p 2 ./... -race -count=1 -coverprofile=coverage.out`; domain92.1%, weighted504/558=90.32%; full log `ctl/logs/fraud/card5c-gates.log` |
 | 2026-10-18 | Memory application latency, `97c4c98` | `go run ./cmd/latency -samples 10000 -raw`; unique p99=5459ns, replay=4209ns; method/environment in `docs/performance.md`, not HTTP/SQL/S1 |
-| 2026-10-18 | Documentation/CI gate card, parent `97c4c98` | `go test ./scripts -count=1`; workflow parsed and weighted thresholds fixture-tested. Hosted workflow UNVERIFIED: not run. Exact card hash/evidence appended to STATUS to avoid self-referential commit hashes |
+| 2026-10-18 | Documentation/CI gate card, `9132b35` | `go test ./scripts -count=1`; workflow parsed and weighted thresholds fixture-tested. Hosted workflow UNVERIFIED: not run. Exact card hash/evidence appended to STATUS to avoid self-referential commit hashes |
+
+## Response contract checkpoint
+
+Card7 starts from `9132b35`: explicit explanation and PascalCase RuleConfig success schemas, empty feedback202, canonical explanation DENY versus score BLOCK, all declared v1 statuses, all reason enums, learned/extreme exact integer policies, negative response mutations and response/schema reference resolution. Verification: `go test -p 2 ./internal/api -race -count=1` plus full native gates. Native resumed gates completed 2026-10-19: API96.0%, domain92.1%, query95.9%, repository93.5%, service90.9%, playback61.5%; weighted non-cmd505/558=90.50%, domain70/76=92.11%. Real PostgreSQL86.635s without skips. Full evidence `ctl/logs/fraud/card7-resumed-gates.log` and `card7.cover`; exact card commit recorded in append-only STATUS. This is targeted response checking, not full OpenAPI/request semantic validation.
 
 ## Reproducible native gates
 
@@ -55,7 +59,7 @@ The active `openspec/changes/production-fraud` proposal remains **Partial**, not
 
 - Validated RuleConfig injection and feedback learning exist, but no runtime policy-edit API/env. GET rules exposes PascalCase fields.
 - SQL stores one locked full-history JSONB snapshot. Memory scoped operations copy selected account history under one mutex; retention/time indexing/scalable relational SQL are missing.
-- Route/status/error families are tested, but success explanation/rules schemas and semantic schema validation are incomplete.
+- Existing v1 response success/error schemas are declared and checked against handlers, including explanation/rules. The targeted helper is not a full semantic OpenAPI/request validator; arbitrary composition, patterns/formats and cross-field schema relations remain outside its scope.
 - Cold-clone under-two-minute timing, hosted CI, Linux/Windows, production migrations/backup/restore and real-process SQL HTTP crash drills are not verified.
 - Separate-process10k S1 with injected faults belongs to manager integration/load; neither microtiming nor1000-call playback proves it.
 
