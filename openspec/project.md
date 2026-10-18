@@ -34,7 +34,13 @@ Commands verify the named capability at the current tree; hashes identify its mi
 
 ## Response contract checkpoint
 
-Card7 starts from `9132b35`: explicit explanation and PascalCase RuleConfig success schemas, empty feedback202, canonical explanation DENY versus score BLOCK, all declared v1 statuses, all reason enums, learned/extreme exact integer policies, negative response mutations and response/schema reference resolution. Verification: `go test -p 2 ./internal/api -race -count=1` plus full native gates. Native resumed gates completed 2026-10-19: API96.0%, domain92.1%, query95.9%, repository93.5%, service90.9%, playback61.5%; weighted non-cmd505/558=90.50%, domain70/76=92.11%. Real PostgreSQL86.635s without skips. Full evidence `ctl/logs/fraud/card7-resumed-gates.log` and `card7.cover`; exact card commit recorded in append-only STATUS. This is targeted response checking, not full OpenAPI/request semantic validation.
+Card7 `2a09ede` (parent `9132b35`): explicit explanation and PascalCase RuleConfig success schemas, empty feedback202, canonical explanation DENY versus score BLOCK, all declared v1 statuses, all reason enums, learned/extreme exact integer policies, negative response mutations and response/schema reference resolution. Verification: `go test -p 2 ./internal/api -race -count=1` plus full native gates. Native resumed gates completed 2026-10-19: API96.0%, domain92.1%, query95.9%, repository93.5%, service90.9%, playback61.5%; weighted non-cmd505/558=90.50%, domain70/76=92.11%. Real PostgreSQL86.635s without skips. Full evidence `ctl/logs/fraud/card7-resumed-gates.log` and `card7.cover`; exact card commit recorded in append-only STATUS. This is targeted response checking, not full OpenAPI/request semantic validation.
+
+## Domain invariant checkpoint
+
+Card8 parent `2a09ede`, verified 2026-10-19: current source/profile confirmed the six uncovered blocks in ParseMinorUnits and ScoreWithRules/RuleConfig.Validate. Meaningful malformed-money, invalid-policy and REVIEW assertions now reach all six. Tests also cover every configured limit/weight/relationship, exact int64/scale/currency boundaries, 1000 deterministic canonical money round trips, capped reason retention and deterministic/nondecreasing geo-signal properties. No production source, safety check, API or dependency changed.
+
+One native format/build/vet/full-race/tidy/coverage gate pass succeeded; `ctl/logs/fraud/card8-gates.log` / `card8.cover`: domain76/76=100.00%, weighted non-cmd511/558=91.58%. API96.0%, query95.9%, repository93.5%, service90.9%, playback61.5%; actual SQL/repository suite89.162s, no skips. No remaining uncovered domain statement block or unreachable-exclusion claim; statement100% is not exhaustive input/path proof. Exact card commit recorded in append-only STATUS.
 
 ## Reproducible native gates
 

@@ -97,20 +97,21 @@ go test ./internal/domain -run '^$' -fuzz '^FuzzStructuringBand$' -fuzztime=2s -
 go run ./cmd/latency -samples 10000 -raw
 ```
 
-The SQL test **fails**, rather than skips, if its binary download/startup fails. It needs network on first use, an unprivileged user and a free ephemeral TCP port. The native suite's SQL portion took 91.593s in the recorded run. Tests use injected clocks, channels and listeners rather than synchronization sleeps. The playback retry policy's timer is intentional backoff, not test synchronization.
+The SQL test **fails**, rather than skips, if its binary download/startup fails. It needs network on first use, an unprivileged user and a free ephemeral TCP port. The 2026-10-19 native repository suite, including actual SQL startup/restart, took 89.162s. Tests use injected clocks, channels and listeners rather than synchronization sleeps. The playback retry policy's timer is intentional backoff, not test synchronization.
 
-Measured 2026-10-18 at `97c4c98`, Go 1.27.1 darwin/arm64, Apple M1 / 16 GiB:
+Latest correctness run: 2026-10-19, parent `2a09ede`, Go 1.27.1 darwin/arm64. Timing/fuzz rows retain their separate 2026-10-18 `97c4c98` measurement (Apple M1 / 16 GiB); they were not rerun for this test-only card.
 
 | Evidence | Result |
 | --- | --- |
 | Race tests | Passed, including actual PostgreSQL parity/restart |
-| Statement coverage | domain92.1%, API95.0%, query95.9%, repository93.5%, service90.9%, playback61.5% |
-| Weighted non-cmd coverage | **504/558 =90.32%**, not a mean of package percentages |
-| Structuring fuzz,2s | 145,053 executions; no failure |
-| Memory application handler,10k unique isolated accounts | p50/p95/p99=1291/3292/5459ns |
-| Exact replay cohort,10k calls | p50/p95/p99=1334/2750/4209ns |
+| Statement coverage | domain100.0%, API96.0%, query95.9%, repository93.5%, service90.9%, playback61.5% |
+| Weighted non-cmd coverage | **511/558 =91.58%**, not a mean of package percentages |
+| Domain invariant evidence | **76/76 statements**, no uncovered blocks; every configured validation limit/relationship, exact money rejection/int64 boundaries, REVIEW/DENY boundaries and score/reason properties asserted |
+| Structuring fuzz,2s (2026-10-18) | 145,053 executions; no failure |
+| Memory application handler,10k unique isolated accounts (2026-10-18) | p50/p95/p99=1291/3292/5459ns |
+| Exact replay cohort,10k calls (2026-10-18) | p50/p95/p99=1334/2750/4209ns |
 
-The response-contract follow-up (2026-10-19, parent `9132b35`) passed the full race suite with API96.0% and weighted non-cmd505/558=90.50%; other package percentages were unchanged. Evidence: `ctl/logs/fraud/card7-resumed-gates.log` / `card7.cover`. Timing was not rerun; the table above retains its original measurement scope/date.
+Current evidence: `ctl/logs/fraud/card8-gates.log` / `card8.cover`. All six previous uncovered domain blocks were reached with meaningful inputs; no production checks were removed or excluded. Statement100% is not a claim of exhaustive branch/input-space proof; unrelated service shutdown/error branches remain partially covered.
 
 Timing excludes HTTP/network, caller payload construction and SQL. Both measured memory p99 values are below the 5ms in-process target; **this is not real-process10k S1 proof**. See [method/raw-evidence location](docs/performance.md), [acceptance status](openspec/dod.md), [glossary](docs/glossary.md) and [ADRs](docs/adr/). Immutable replay, exact money, scope rollback, concurrent velocity, inferred patterns and ambiguous-after-commit retries are the demonstrated engineering properties—not model accuracy or production certification.
 

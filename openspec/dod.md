@@ -6,13 +6,16 @@ Evidence baseline: `97c4c98`, native Go1.27.1 darwin/arm64, 2026-10-18; full rac
 
 Response-contract follow-up, 2026-10-19 (parent `9132b35`): full resumed native gates pass in `ctl/logs/fraud/card7-resumed-gates.log` / `card7.cover`; API96.0%, weighted non-cmd505/558=90.50%, domain70/76=92.11%. Other package percentages unchanged; actual PostgreSQL suite86.635s, no skips. New response-contract tests named below are verified by this run, not inferred from the earlier baseline.
 
+Domain-invariant follow-up, 2026-10-19 (parent `2a09ede`): one native gate pass in `ctl/logs/fraud/card8-gates.log` / `card8.cover`; domain76/76=100.00%, weighted non-cmd511/558=91.58%, no uncovered domain statement blocks. Other package percentages unchanged from card7; actual repository/PostgreSQL suite89.162s, no skips. All six current-source gaps were feasible and reached; no safety check was removed/excluded. This is statement coverage plus explicit invariant assertions, not exhaustive input/branch proof.
+
 ## Met
 
 | Acceptance | Exact test / evidence |
 | --- | --- |
-| Exact nonnegative USD cents, supported scale/currency and overflow rejection without floats | `domain.TestParseMinorUnits`, `domain.FuzzParseMinorUnits`; API uses raw decimal text |
+| Exact nonnegative USD cents, supported scale/currency and overflow rejection without floats | `domain.TestParseMinorUnits`, `FuzzParseMinorUnits`, `TestMoneyRejectsMalformedTextWithoutPartialValue`, `TestMoneyExactScaleAndInt64Boundaries`; typed error/no-partial-value assertions, MaxInt64 and 1000 deterministic integer-only canonical round trips |
 | Strict amount boundaries and default decision bands | `domain.TestScoreAmountCentsBoundariesAndDecisions`, `domain.TestWeightedRulesAndValidation` (with no extra signals/history) |
-| Weighted contextual rules, named reasons and score cap100 | `domain.TestWeightedRulesAndValidation` |
+| Every configured validation threshold/relationship/weight and fail-closed scoring | `domain.TestEveryRuleConfigThresholdAndRelationshipInvariant`, `TestEveryRuleWeightRejectsOutOfRangeAndAcceptsEndpoints`, `TestScoringRejectsNegativeSignalsWithoutPartialDecision`; all seven weights reject -1/101 and accept0/100 |
+| Weighted rules, exact REVIEW/DENY boundaries, score cap and retained deterministic reasons | `domain.TestWeightedRulesAndValidation`, `TestWeightedDecisionAndRuleActivationBoundaries`, `TestScoreCapRetainsAllReasonsAndDeterministicSignalProperties`; equal decision limits prioritize DENY, all seven reasons survive cap, adding a nonnegative geo signal cannot reduce score |
 | Same input/event identity returns original result; changed input rejected | `query.TestReplayReturnsSameAndRejectsChangedPayload`, `api.TestOpenAPIParsedRoutesAndStatuses` |
 | Replay-safe account/window velocity and account/time isolation | `query.TestVelocityWindowReplayAndAccountIsolation`, `query.TestSharedRepositoryConcurrentUniqueEventsAndReplay` |
 | Inferred three-event near-band structuring, exact band/window/replay boundaries | `domain.TestStructuringExactBandAndCountBoundaries`, `query.TestInferredStructuringReplayWindowAndIsolation`; `FuzzStructuringBand` ran145053 executions in2s |
@@ -30,7 +33,7 @@ Response-contract follow-up, 2026-10-19 (parent `9132b35`): full resumed native 
 | Exact PascalCase policy integer serialization and negative contract drift detection | `api.TestRuleConfigSchemaMatchesExtremeExactIntegerSerialization`, `TestResponseSchemaChecksRejectPayloadDrift`, `TestPublishedResponseReferencesAndSchemaDefinitionsResolve`; int64-max amount configuration is preserved without floats |
 | Preserved playback regression:1000 score calls, one503 retry each, exact replay | `playback.TestThousandPerMinuteAndPlayback`; HTTP httptest, not separate service processes or S1 |
 | Client400 not retried; transient503 retried with bounded attempts | `playback.TestDoesNotRetryClientError`, `TestRetriesTransientFailure`, `TestStopsAfterMaxAttempts`; playback helper only, not a downstream production client |
-| Domain>=90%, weighted non-cmd>=80%, race clean | Recorded domain92.1%, weighted504/558=90.32%; API95.0/query95.9/repository93.5/service90.9/playback61.5. `scripts.TestCoverageGateUsesWeightedStatementsAndDomainThreshold` asserts the new gate's weighting/thresholds/excluded cmd behavior |
+| Domain>=90%, weighted non-cmd>=80%, race clean | Latest domain76/76=100.00%, weighted511/558=91.58%; API96.0/query95.9/repository93.5/service90.9/playback61.5. `scripts.TestCoverageGateUsesWeightedStatementsAndDomainThreshold` asserts weighting/thresholds/excluded cmd behavior |
 | Memory application-handler p99<5ms on measured isolated-account workload | `go run ./cmd/latency -samples 10000 -raw`: unique5459ns, replay4209ns; [environment and raw-sample scope](../docs/performance.md). Not HTTP/SQL latency or concurrent throughput |
 
 ## Partial
@@ -41,7 +44,7 @@ Response-contract follow-up, 2026-10-19 (parent `9132b35`): full resumed native 
 | Scalable durable repository | SQL durability/parity proven, but singleton JSONB loads full history and serializes readers/writers. No relational per-event/account-time indexing or retention. Memory scoped account history is also unbounded. |
 | Full semantic OpenAPI validation | Explanation/rules success schemas and targeted v1 response-shape checks are implemented. The helper supports objects/arrays/strings/exact integer text, enums, required/extra properties, min/max/minLength and local references. It is not a full request/schema validator (patterns, general formats, cross-field relations and arbitrary OpenAPI composition are not verified). |
 | Under-two-minute clean-clone run | Minimal Go-only memory instructions supplied; cold download/clean-clone wall time is not measured. Local warm-cache compiled-process smoke checked12 HTTP operations and SIGTERM exit0 (`ctl/logs/fraud/card6-gates.log`); this is not a cold-clone claim. |
-| All error/shutdown branches and domain invariants exhaustively covered | Measured domain92.1%, service90.9%, not100%; no claim of exhaustive branch/property coverage. |
+| All error/shutdown branches and exhaustive input/path proof | Domain has100% statement coverage and explicit validation/money/decision invariants asserted, but that is not a proof over all inputs/branches. Service remains90.9%; shutdown/error-path completeness is not claimed. |
 | Hiring-manager documentation / CI | README, diagram, curl, glossary, ADRs and measured report supplied; workflow and weighted gate specified/tested locally, but hosted workflow remains UNVERIFIED: not run. |
 
 ## Unmet / not claimed
