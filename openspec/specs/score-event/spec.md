@@ -43,6 +43,31 @@ GET /v1/events/{event_id}/explanation SHALL return the stored decision or 404. G
 - **WHEN** a false-positive label is applied
 - **THEN** ReviewAt remains equal to DenyAt and configuration validates.
 
+### Requirement: Inferred account-window structuring
+The service SHALL infer STRUCTURING for the third and subsequent unique same-account attempt in the active window when the current and at least two prior amounts lie in [band-floor(band/10),band], excluding zero amounts. The qualifying prior count SHALL be stored. Legacy caller structuring=true SHALL remain additive; false SHALL NOT suppress inference. Replay SHALL retain the original result rather than being reclassified.
+
+#### Scenario: Third near-band attempt
+- **GIVEN** two unique near-band account attempts and arbitrary identical retries
+- **WHEN** another unique near-band attempt is scored
+- **THEN** STRUCTURING weight is added exactly once
+- **AND** other accounts, expired/future timestamps and out-of-band amounts do not qualify.
+
+### Requirement: Scoped memory atomicity
+Application memory transactions SHALL select addressed event/feedback and requested account history, plus global policy. Out-of-scope writes or collisions with excluded events SHALL fail atomically. Full Update and SQL fallback SHALL preserve application behavior.
+
+#### Scenario: Scope collision
+- **GIVEN** an existing event belonging to an excluded account
+- **WHEN** a callback attempts to overwrite its identity through another account scope
+- **THEN** the complete update is rejected and original state remains.
+
+### Requirement: Retry after ambiguous HTTP response
+A canceled response after commit SHALL NOT duplicate effects when the same event_id and payload are retried.
+
+#### Scenario: Commit before response cancellation
+- **GIVEN** a fault wrapper that commits then waits for request cancellation
+- **WHEN** the response fails and the same event is retried
+- **THEN** its original result is returned and only one velocity/pattern contribution exists.
+
 ### Requirement: Durable transactional repository
 The optional PostgreSQL adapter SHALL atomically retain replay identities, decisions, rule snapshots, velocity timestamps and feedback labels across a database restart. Callback errors SHALL roll back complete updates. DATABASE_URL selects this adapter at server startup; unset selects non-durable process memory. It loads/writes one full-history JSONB snapshot and makes no scalable-throughput claim.
 

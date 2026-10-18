@@ -19,11 +19,12 @@ type EventInput struct {
 }
 
 type EventRecord struct {
-	Input       EventInput
-	Result      domain.RiskDecision
-	RecordedAt  time.Time
-	RecentCount int
-	Rules       domain.RuleConfig
+	Input            EventInput
+	Result           domain.RiskDecision
+	RecordedAt       time.Time
+	RecentCount      int
+	StructuringCount int
+	Rules            domain.RuleConfig
 }
 
 type EventState struct {
@@ -39,12 +40,13 @@ type EventStore interface {
 }
 
 type MemoryEvents struct {
-	mu    sync.Mutex
-	state EventState
+	mu        sync.Mutex
+	state     EventState
+	byAccount map[string]map[string]struct{}
 }
 
 func NewMemoryEvents(config domain.RuleConfig) *MemoryEvents {
-	return &MemoryEvents{state: EventState{Events: make(map[string]EventRecord), Feedback: make(map[string]string), Rules: config}}
+	return &MemoryEvents{state: EventState{Events: make(map[string]EventRecord), Feedback: make(map[string]string), Rules: config}, byAccount: make(map[string]map[string]struct{})}
 }
 
 func cloneState(s EventState) EventState {
@@ -76,5 +78,9 @@ func (m *MemoryEvents) Update(ctx context.Context, fn func(*EventState) error) e
 		return err
 	}
 	m.state = cloneState(next)
+	m.byAccount = make(map[string]map[string]struct{})
+	for id, record := range m.state.Events {
+		m.index(id, record.Input.Account)
+	}
 	return nil
 }

@@ -145,7 +145,7 @@ components:
         geo_mismatch: {type: boolean}
         device_mismatch: {type: boolean}
         new_payee: {type: boolean}
-        structuring: {type: boolean}
+        structuring: {type: boolean, description: 'Legacy additive signal. Independently, the third unique same-account event in the active window is inferred as structuring when it and at least two prior amounts lie within the inclusive top 10% of StructuringBandCents. False cannot suppress inference.'}
     ScoreResponse:
       type: object
       required: [event_id, score, decision, reasons]

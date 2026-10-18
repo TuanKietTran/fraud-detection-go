@@ -143,6 +143,22 @@ func TestPostgresEventParity(t *testing.T) {
 			}); err != nil {
 				t.Fatal(err)
 			}
+			for i := 0; i < 3; i++ {
+				d, err := h.Handle(ctx, query.ScoreEventQuery{EventID: fmt.Sprintf("pattern-%d", i), Account: "structuring", AmountCents: 95000})
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := 0
+				if i > 0 {
+					want = rules.VelocityWeight
+				}
+				if i == 2 {
+					want += rules.StructuringWeight
+				}
+				if d.Score != want {
+					t.Fatalf("inferred pattern parity %d: %+v", i, d)
+				}
+			}
 		})
 	}
 	// Restart the actual database, not just a handler, retaining its data directory.

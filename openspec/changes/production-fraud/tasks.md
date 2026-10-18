@@ -5,5 +5,5 @@
 - [x] Replace float amount with exact amount/currency and validated rules.
 - [x] Add internal velocity, geo/device mismatch, new-payee and supplied-structuring rules with invariant tests.
 - [x] Persist replay-safe decisions through memory/Postgres ports and expose explanation/config/feedback use cases (Postgres server selection pending).
-- [ ] Infer structuring patterns from account event history instead of requiring the contextual flag.
+- [x] Infer near-band structuring patterns from account/window event history; preserve contextual flag only as an additional signal.
 - [ ] Add memory/Postgres parity, HTTP hardening, measured latency and operational docs.

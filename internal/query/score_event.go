@@ -49,13 +49,20 @@ func cloneDecision(d domain.RiskDecision) domain.RiskDecision {
 	return d
 }
 
+func (h *ScoreEventHandler) update(ctx context.Context, scope repository.EventScope, fn func(*repository.EventState) error) error {
+	if store, ok := h.store.(repository.ScopedEventStore); ok {
+		return store.UpdateScoped(ctx, scope, fn)
+	}
+	return h.store.Update(ctx, fn)
+}
+
 func (h *ScoreEventHandler) Rules() domain.RuleConfig {
 	rules, _ := h.LoadRules(context.Background())
 	return rules
 }
 func (h *ScoreEventHandler) LoadRules(ctx context.Context) (domain.RuleConfig, error) {
 	var rules domain.RuleConfig
-	err := h.store.Update(ctx, func(s *repository.EventState) error { rules = s.Rules; return nil })
+	err := h.update(ctx, repository.EventScope{}, func(s *repository.EventState) error { rules = s.Rules; return nil })
 	return rules, err
 }
 func (h *ScoreEventHandler) Explain(eventID string) (domain.RiskDecision, bool) {
@@ -65,7 +72,7 @@ func (h *ScoreEventHandler) Explain(eventID string) (domain.RiskDecision, bool) 
 func (h *ScoreEventHandler) ExplainContext(ctx context.Context, eventID string) (domain.RiskDecision, bool, error) {
 	var result domain.RiskDecision
 	var ok bool
-	err := h.store.Update(ctx, func(s *repository.EventState) error {
+	err := h.update(ctx, repository.EventScope{EventID: eventID}, func(s *repository.EventState) error {
 		record, found := s.Events[eventID]
 		ok = found
 		result = cloneDecision(record.Result)
@@ -77,7 +84,7 @@ func (h *ScoreEventHandler) Feedback(eventID, label string) error {
 	return h.FeedbackContext(context.Background(), eventID, label)
 }
 func (h *ScoreEventHandler) FeedbackContext(ctx context.Context, eventID, label string) error {
-	return h.store.Update(ctx, func(s *repository.EventState) error {
+	return h.update(ctx, repository.EventScope{EventID: eventID}, func(s *repository.EventState) error {
 		if _, ok := s.Events[eventID]; !ok {
 			return ErrNotFound
 		}
@@ -107,7 +114,7 @@ func (h *ScoreEventHandler) Handle(ctx context.Context, q ScoreEventQuery) (doma
 		return domain.RiskDecision{}, fmt.Errorf("%w: event_id, account and nonnegative amount/count required", ErrInvalid)
 	}
 	var result domain.RiskDecision
-	err := h.store.Update(ctx, func(s *repository.EventState) error {
+	err := h.update(ctx, repository.EventScope{EventID: q.EventID, Account: q.Account, History: true}, func(s *repository.EventState) error {
 		if old, ok := s.Events[q.EventID]; ok {
 			if old.Input != q {
 				return fmt.Errorf("%w: event_id replay payload conflict", ErrConflict)
@@ -116,22 +123,25 @@ func (h *ScoreEventHandler) Handle(ctx context.Context, q ScoreEventQuery) (doma
 			return nil
 		}
 		now := h.now().UTC()
-		recent := 0
+		recent, nearBand := 0, 0
 		for _, record := range s.Events {
 			if record.Input.Account == q.Account && record.RecordedAt.After(now.Add(-h.window)) && !record.RecordedAt.After(now) {
 				recent++
+				if domain.NearStructuringBand(record.Input.AmountCents, s.Rules.StructuringBandCents) {
+					nearBand++
+				}
 			}
 		}
 		// Preserve the published legacy signal, but clients cannot lower our count.
 		if q.RecentCount > recent {
 			recent = q.RecentCount
 		}
-		score, decision, reasons, err := domain.ScoreWithRules(domain.Signals{AmountCents: q.AmountCents, RecentCount: recent, GeoMismatch: q.GeoMismatch, DeviceMismatch: q.DeviceMismatch, NewPayee: q.NewPayee, Structuring: q.Structuring}, s.Rules)
+		score, decision, reasons, err := domain.ScoreWithRules(domain.Signals{AmountCents: q.AmountCents, RecentCount: recent, GeoMismatch: q.GeoMismatch, DeviceMismatch: q.DeviceMismatch, NewPayee: q.NewPayee, Structuring: q.Structuring || domain.InferredStructuring(q.AmountCents, s.Rules.StructuringBandCents, nearBand)}, s.Rules)
 		if err != nil {
 			return err
 		}
 		result = domain.RiskDecision{EventID: q.EventID, Score: score, Decision: decision, ReasonCodes: reasons}
-		s.Events[q.EventID] = repository.EventRecord{Input: q, Result: cloneDecision(result), RecordedAt: now, RecentCount: recent, Rules: s.Rules}
+		s.Events[q.EventID] = repository.EventRecord{Input: q, Result: cloneDecision(result), RecordedAt: now, RecentCount: recent, StructuringCount: nearBand, Rules: s.Rules}
 		return nil
 	})
 	return result, err

@@ -1,6 +1,6 @@
 # Fraud detection
 
-Exact-money weighted scoring with transactional process-memory replay, explanations, feedback and account-window velocity. Optional PostgreSQL persistence and bounded operational runtime are implemented; scalability, inferred structuring and measured latency remain unfinished.
+Exact-money weighted scoring with transactional process-memory replay, explanations, feedback and account-window velocity. Optional PostgreSQL persistence and bounded operational runtime are implemented; scalability limitations and final operational documentation remain. Inferred structuring and scoped-memory application latency are now measured/tested.
 
 ## Stack
 
@@ -36,8 +36,12 @@ Starting commit `4293c22`; native `GOTOOLCHAIN=local FRAUD_POSTGRES_CACHE=<cache
 ## Pending mandatory work
 
 - Rule configuration updates beyond validated injected policies and deterministic feedback learning.
-- Measured memory latency/scoped transaction optimization, hiring-manager README and CI/DoD completion.
-- Inferred structuring patterns (current contextual flag is supplied), measured p99 and operational docs.
+- Hiring-manager README, CI/DoD completion and final OpenSpec reconciliation.
+- Scalable PostgreSQL/per-account retention remain explicit limits, not completed production capabilities.
+
+## Inferred structuring / scoped memory checkpoint
+
+Starting commit `26757f9`; native build/vet/race/tidy/format gates passed (`ctl/logs/fraud/card5c-gates.log`), including real PostgreSQL inferred-pattern parity (91.593s). Domain92.1%, weighted non-cmd504/558=90.32%. `go test ./internal/domain -run '^$' -fuzz '^FuzzStructuringBand$' -fuzztime=2s -parallel=2`:145053 executions. `go run ./cmd/latency -samples 10000 -raw`: unique p99=5459ns, replay p99=4209ns, memory application handler only. Environment/scope/raw report in `docs/performance.md`. Card hash recorded in append-only STATUS.
 
 ## Native macOS continuation checkpoint
 
