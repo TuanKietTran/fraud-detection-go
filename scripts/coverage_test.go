@@ -26,7 +26,7 @@ func TestCoverageGateUsesWeightedStatementsAndDomainThreshold(t *testing.T) {
 			if err := os.WriteFile(path, []byte(tc.profile), 0600); err != nil {
 				t.Fatal(err)
 			}
-			output, err := exec.Command("bash", "check-coverage.sh", path).CombinedOutput()
+			output, err := exec.Command("go", "run", "./coveragegate", path).CombinedOutput()
 			if (err == nil) != tc.pass {
 				t.Fatalf("pass=%v error=%v output=%s", tc.pass, err, output)
 			}
@@ -59,7 +59,7 @@ func TestWorkflowParsesWithRequiredLocalGateCommands(t *testing.T) {
 		}
 	}
 	all := strings.Join(runs, "\n")
-	for _, required := range []string{"gofmt -l .", "go build ./...", "go vet ./...", "go test -p 2 ./... -race -count=1 -coverprofile=coverage.out", "go tool cover -func=coverage.out", "bash scripts/check-coverage.sh coverage.out", "git diff --exit-code -- go.mod go.sum"} {
+	for _, required := range []string{"gofmt -l .", "go build ./...", "go vet ./...", "go test -p 2 ./... -race -count=1 -coverprofile=coverage.out", "go tool cover -func=coverage.out", "go run ./scripts/coveragegate coverage.out", "git diff --exit-code -- go.mod go.sum"} {
 		if !strings.Contains(all, required) {
 			t.Errorf("missing workflow gate %q", required)
 		}

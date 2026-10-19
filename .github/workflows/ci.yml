@@ -31,7 +31,7 @@ jobs:
       - name: Coverage summary and weighted gates
         run: |
           go tool cover -func=coverage.out
-          bash scripts/check-coverage.sh coverage.out
+          go run ./scripts/coveragegate coverage.out
       - name: Dependency hygiene
         run: |
           go mod tidy
