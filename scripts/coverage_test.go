@@ -15,7 +15,7 @@ func TestCoverageGateUsesWeightedStatementsAndDomainThreshold(t *testing.T) {
 		name, profile string
 		pass          bool
 	}{
-		{"passes-boundaries-excludes-cmd", "mode: atomic\nx/internal/domain/d.go:1.1,2.1 90 1\nx/internal/domain/d.go:3.1,4.1 10 0\nx/internal/api/a.go:1.1,2.1 10 0\nx/cmd/server/m.go:1.1,2.1 5000 0\n", true},
+		{"passes-boundaries-excludes-cmd", "mode: atomic\nx/internal/domain/d.go:1.1,2.1 90 1\nx/internal/domain/d.go:3.1,4.1 10 0\nx/internal/api/a.go:1.1,2.1 10 0\nx/internal/api/zero.go:1.1,2.1 0 1\nx/cmd/server/m.go:1.1,2.1 5000 0\n", true},
 		{"fails-domain", "mode: atomic\nx/internal/domain/d.go:1.1,2.1 80 1\nx/internal/domain/d.go:3.1,4.1 20 0\n", false},
 		{"fails-weighted-not-package-average", "mode: atomic\nx/internal/domain/d.go:1.1,2.1 90 1\nx/internal/domain/d.go:3.1,4.1 10 0\nx/internal/api/a.go:1.1,2.1 100 0\n", false},
 		{"empty", "mode: atomic\n", false},

@@ -31,7 +31,7 @@ func main() {
 			fail("invalid coverage profile line: " + line)
 		}
 		var statements, count int64
-		if _, err := fmt.Sscan(fields[1], &statements); err != nil || statements <= 0 {
+		if _, err := fmt.Sscan(fields[1], &statements); err != nil || statements < 0 {
 			fail("invalid statement count: " + line)
 		}
 		if _, err := fmt.Sscan(fields[2], &count); err != nil || count < 0 {
