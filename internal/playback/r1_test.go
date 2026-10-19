@@ -118,5 +118,5 @@ func TestR1ProductionRouterTenThousand(t *testing.T) {
 	if injected503.Load()+injected429.Load() < TargetRequestsPerMinute/20 || injected429.Load() == 0 || injectedTimeout.Load() < TargetRequestsPerMinute/100 {
 		t.Fatalf("faults 503=%d 429=%d timeout=%d", injected503.Load(), injected429.Load(), injectedTimeout.Load())
 	}
-	t.Logf("production-router replay: %d logical calls, %d unique decisions, elapsed=%s", len(outcomes), eventCount, elapsed)
+	t.Logf("production-router replay: %d logical calls, %d unique decisions, 503=%d 429=%d timeouts=%d elapsed=%s", len(outcomes), eventCount, injected503.Load(), injected429.Load(), injectedTimeout.Load(), elapsed)
 }
