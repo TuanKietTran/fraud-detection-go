@@ -101,12 +101,17 @@ HTTP_ADDR defaults to :8103 and SHALL name a valid nonzero port. DATABASE_URL SH
 - **THEN** readiness is 200 and serving terminates without synchronization sleeps.
 
 ### Requirement: Operational endpoints
-GET /healthz SHALL report process liveness, GET /readyz SHALL probe the selected event store and return 503 when unavailable, and GET /metrics SHALL return process-local requests_total and failures_total (HTTP 5xx) counters.
+GET /healthz SHALL report process liveness, GET /readyz SHALL probe the selected event store and return 503 when unavailable, and GET /metrics SHALL return process-local requests_total and failures_total (HTTP 5xx), goroutine count, heap allocated/system bytes, cumulative GC count/pause nanoseconds and live TCP connection count. Runtime pprof profiles SHALL be served only to loopback peers at `/debug/pprof/` and documented profile subpaths.
 
 #### Scenario: Store unavailable
 - **GIVEN** a repository returning an error
 - **WHEN** health and readiness are queried
 - **THEN** health is 200 and readiness is 503.
+
+#### Scenario: Runtime resource sampling
+- **WHEN** `/metrics` is queried
+- **THEN** it includes heap, goroutine, connection and cumulative GC pause counters.
+- **AND** pprof is accessible from loopback and returns not found to non-loopback peers.
 
 ### Requirement: Honest reproducible engineering evidence
 Documentation SHALL distinguish measured memory application latency, httptest playback and real-process cross-service load. Every Met acceptance row SHALL name an asserting test or actual timing command. Missing runtime policy editing, scalable SQL and unexecuted workflow/deployment evidence SHALL remain explicitly Partial/Unmet.

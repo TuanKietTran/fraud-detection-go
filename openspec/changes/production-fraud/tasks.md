@@ -7,7 +7,9 @@
 - [x] Persist replay-safe decisions through memory/Postgres ports and expose explanation/config/feedback use cases; DATABASE_URL server selection is implemented and tested.
 - [x] Infer near-band structuring patterns from account/window event history; preserve contextual flag only as an additional signal.
 - [x] Add real memory/Postgres parity/restart, HTTP/runtime hardening, measured application latency and operational docs.
-- [x] Supply CI workflow plus locally tested weighted coverage gate; hosted execution remains UNVERIFIED.
+- [x] Supply CI workflow plus locally tested portable Go weighted coverage gate; hosted execution remains UNVERIFIED.
+- [x] Implement R1 playback through production HTTP router: 10,000 logical calls, 2% same-event duplicates, >=5% transient 503/429, 1% per-attempt timeouts, bounded concurrency, six-attempt full-jitter exponential retries; assert all calls terminal and one decision per unique event identity.
+- [x] Expose runtime heap/goroutine/GC-pause/TCP-connection sampling and loopback-only pprof URLs; test response fields and external-peer denial.
 
 ## Open acceptance (proposal remains Partial)
 
