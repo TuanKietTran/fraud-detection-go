@@ -2,14 +2,17 @@
 
 ## Purpose
 
-Score playback sends 1000 events spread across amounts 100, 6000, and 20000. Both plays return HTTP 200 with the same body. The set of decisions includes ALLOW, REVIEW, and BLOCK. Scoring stays stateless.
+The legacy playback fixture sends 1000 events across representative amounts. R1 playback sends 10,000 logical requests through the production HTTP router, with 2% duplicate submissions, transient HTTP faults and timeouts. Scoring is replay-safe and retains one decision per event identity.
 
 ## Requirements
 
-### Requirement: Finish 1000 requests inside one minute
-The playback client SHALL complete 1000 recorded calls in less than 60 seconds, including one transient failure and a successful retry on each call.
+### Requirement: Finish R1 requests inside one minute
+The playback client SHALL complete 10,000 logical calls inside 60 seconds using bounded concurrency and at most six attempts per call. It SHALL retry transport failures, per-attempt timeouts, HTTP 408, 429 and 5xx with exponential backoff, full jitter, a 50ms base and 2s cap; it SHALL NOT retry business 4xx. Its production-router test SHALL inject at least 5% 503 (including some 429), 1% timeouts and 2% identical duplicate submissions, then assert terminal successes and one stored decision per unique event key.
 
-#### Scenario: Burst with one 503 per call
+### Requirement: Preserve legacy playback regression
+The playback client SHALL continue to complete the 1000-call fixture in less than 60 seconds, including transient retries.
+
+#### Scenario: Legacy burst with one 503 per call
 - **GIVEN** the server returns HTTP 503 on the first attempt of each distinct body and then succeeds
 - **WHEN** the client plays 1000 calls with at most 3 attempts
 - **THEN** every call ends on the success status

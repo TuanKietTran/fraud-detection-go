@@ -8,6 +8,9 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/http/pprof"
+	"runtime"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -73,6 +76,9 @@ func (w *statusWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }
 func NewHTTPServer(c Config, store repository.EventStore, logger *slog.Logger) *http.Server {
 	score, _ := query.NewScoreEventHandlerWithStore(store, time.Now, time.Minute)
 	var requests, failures atomic.Uint64
+	var connections atomic.Int64
+	var connMu sync.Mutex
+	connState := make(map[net.Conn]http.ConnState)
 	r := chi.NewRouter()
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -130,10 +136,54 @@ func NewHTTPServer(c Config, store repository.EventStore, logger *slog.Logger) *
 	})
 	r.Get("/metrics", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]uint64{"requests_total": requests.Load(), "failures_total": failures.Load()})
+		var mem runtime.MemStats
+		runtime.ReadMemStats(&mem)
+		_ = json.NewEncoder(w).Encode(map[string]uint64{"requests_total": requests.Load(), "failures_total": failures.Load(), "goroutines": uint64(runtime.NumGoroutine()), "heap_alloc_bytes": mem.HeapAlloc, "heap_sys_bytes": mem.HeapSys, "gc_count": uint64(mem.NumGC), "gc_pause_total_ns": mem.PauseTotalNs, "connections": uint64(max(0, connections.Load()))})
 	})
 	r.Mount("/v1", api.NewHandlers(score).Routes())
-	return &http.Server{Addr: c.Address, Handler: r, ReadHeaderTimeout: 2 * time.Second, ReadTimeout: c.RequestTimeout + 2*time.Second, WriteTimeout: c.RequestTimeout + 2*time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+	for _, path := range []string{"/debug/pprof/", "/debug/pprof/cmdline", "/debug/pprof/profile", "/debug/pprof/symbol", "/debug/pprof/trace", "/debug/pprof/heap", "/debug/pprof/goroutine", "/debug/pprof/allocs", "/debug/pprof/block", "/debug/pprof/mutex", "/debug/pprof/threadcreate"} {
+		path := path
+		r.HandleFunc(path, func(w http.ResponseWriter, req *http.Request) {
+			host, _, err := net.SplitHostPort(req.RemoteAddr)
+			if err != nil || net.ParseIP(host) == nil || !net.ParseIP(host).IsLoopback() {
+				http.NotFound(w, req)
+				return
+			}
+			switch path {
+			case "/debug/pprof/":
+				pprof.Index(w, req)
+			case "/debug/pprof/cmdline":
+				pprof.Cmdline(w, req)
+			case "/debug/pprof/profile":
+				pprof.Profile(w, req)
+			case "/debug/pprof/symbol":
+				pprof.Symbol(w, req)
+			case "/debug/pprof/trace":
+				pprof.Trace(w, req)
+			default:
+				pprof.Handler(path[len("/debug/pprof/"):]).ServeHTTP(w, req)
+			}
+		})
+	}
+	server := &http.Server{Addr: c.Address, Handler: r, ReadHeaderTimeout: 2 * time.Second, ReadTimeout: c.RequestTimeout + 2*time.Second, WriteTimeout: c.RequestTimeout + 2*time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+	server.ConnState = func(conn net.Conn, state http.ConnState) {
+		connMu.Lock()
+		defer connMu.Unlock()
+		_, exists := connState[conn]
+		if state == http.StateNew && !exists {
+			connState[conn] = state
+			connections.Add(1)
+		}
+		if state == http.StateClosed || state == http.StateHijacked {
+			if exists {
+				delete(connState, conn)
+				connections.Add(-1)
+			}
+		} else if exists {
+			connState[conn] = state
+		}
+	}
+	return server
 }
 
 func operationalError(w http.ResponseWriter, status int) {

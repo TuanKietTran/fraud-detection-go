@@ -5,14 +5,17 @@ import (
 	"context"
 	"errors"
 	"io"
+	"math/rand/v2"
 	"net/http"
+	"sync"
 	"time"
 )
 
 // RequestsPerMinute is the throughput the playback client must finish inside Window.
 const (
-	RequestsPerMinute = 1000
-	Window            = time.Minute
+	RequestsPerMinute       = 1000
+	TargetRequestsPerMinute = 10000
+	Window                  = time.Minute
 )
 
 // Call is one recorded HTTP request. Playback sends the same value again.
@@ -32,12 +35,15 @@ type Outcome struct {
 
 // Policy controls retries. Only transport errors and HTTP 408, 429, and 5xx are retried.
 type Policy struct {
-	MaxAttempts int
-	BaseDelay   time.Duration
+	MaxAttempts    int
+	BaseDelay      time.Duration
+	MaxDelay       time.Duration
+	AttemptTimeout time.Duration
+	Concurrency    int
 }
 
 func DefaultPolicy() Policy {
-	return Policy{MaxAttempts: 3}
+	return Policy{MaxAttempts: 6, BaseDelay: 50 * time.Millisecond, MaxDelay: 2 * time.Second, AttemptTimeout: 2 * time.Second, Concurrency: 64}
 }
 
 func Retryable(status int) bool {
@@ -56,15 +62,37 @@ func Play(ctx context.Context, client *http.Client, baseURL string, calls []Call
 	if policy.MaxAttempts < 1 {
 		policy.MaxAttempts = 1
 	}
-	out := make([]Outcome, len(calls))
-	for i, call := range calls {
-		outcome, err := playOne(ctx, client, baseURL, call, policy)
-		out[i] = outcome
-		if err != nil {
-			return out, err
-		}
+	if policy.Concurrency < 1 {
+		policy.Concurrency = 1
 	}
-	return out, nil
+	out := make([]Outcome, len(calls))
+	jobs := make(chan int)
+	var wg sync.WaitGroup
+	var firstErr error
+	var errMu sync.Mutex
+	for worker := 0; worker < policy.Concurrency && worker < len(calls); worker++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := range jobs {
+				outcome, err := playOne(ctx, client, baseURL, calls[i], policy)
+				out[i] = outcome
+				if err != nil {
+					errMu.Lock()
+					if firstErr == nil {
+						firstErr = err
+					}
+					errMu.Unlock()
+				}
+			}
+		}()
+	}
+	for i := range calls {
+		jobs <- i
+	}
+	close(jobs)
+	wg.Wait()
+	return out, firstErr
 }
 
 func playOne(ctx context.Context, client *http.Client, baseURL string, call Call, policy Policy) (Outcome, error) {
@@ -75,6 +103,10 @@ func playOne(ctx context.Context, client *http.Client, baseURL string, call Call
 		}
 		if attempt > 1 && policy.BaseDelay > 0 {
 			delay := policy.BaseDelay << (attempt - 2)
+			if policy.MaxDelay > 0 && delay > policy.MaxDelay {
+				delay = policy.MaxDelay
+			}
+			delay = time.Duration(rand.Int64N(int64(delay) + 1))
 			timer := time.NewTimer(delay)
 			select {
 			case <-ctx.Done():
@@ -83,8 +115,14 @@ func playOne(ctx context.Context, client *http.Client, baseURL string, call Call
 			case <-timer.C:
 			}
 		}
-		req, err := http.NewRequestWithContext(ctx, call.Method, baseURL+call.Path, bytes.NewReader(call.Body))
+		attemptCtx := ctx
+		cancel := func() {}
+		if policy.AttemptTimeout > 0 {
+			attemptCtx, cancel = context.WithTimeout(ctx, policy.AttemptTimeout)
+		}
+		req, err := http.NewRequestWithContext(attemptCtx, call.Method, baseURL+call.Path, bytes.NewReader(call.Body))
 		if err != nil {
+			cancel()
 			return last, err
 		}
 		if len(call.Body) > 0 {
@@ -93,15 +131,17 @@ func playOne(ctx context.Context, client *http.Client, baseURL string, call Call
 		resp, err := client.Do(req)
 		last.Attempts = attempt
 		if err != nil {
+			cancel()
 			last.Err = err
 			last.Status = 0
-			if attempt == policy.MaxAttempts || !retryableErr(err) {
+			if attempt == policy.MaxAttempts || ctx.Err() != nil || !retryableErr(err) {
 				return last, nil
 			}
 			continue
 		}
 		body, readErr := io.ReadAll(resp.Body)
 		resp.Body.Close()
+		cancel()
 		if readErr != nil {
 			last.Err = readErr
 			last.Status = resp.StatusCode
@@ -121,5 +161,5 @@ func playOne(ctx context.Context, client *http.Client, baseURL string, call Call
 }
 
 func retryableErr(err error) bool {
-	return err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded)
+	return err != nil && !errors.Is(err, context.Canceled)
 }

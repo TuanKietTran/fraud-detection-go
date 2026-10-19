@@ -52,7 +52,7 @@ func TestThousandPerMinuteAndPlayback(t *testing.T) {
 		}
 	}
 	start := time.Now()
-	first, err := Play(context.Background(), srv.Client(), srv.URL, calls, DefaultPolicy())
+	first, err := Play(context.Background(), srv.Client(), srv.URL, calls, Policy{MaxAttempts: 3, Concurrency: 64})
 	elapsed := time.Since(start)
 	if err != nil {
 		t.Fatal(err)

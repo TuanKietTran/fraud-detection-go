@@ -22,11 +22,27 @@ paths:
         '503': {$ref: '#/components/responses/Unavailable'}
   /metrics:
     get:
-      summary: JSON counters requests_total and failures_total (HTTP 5xx)
+      summary: JSON request/failure counters and runtime resources (goroutines, heap, GC pauses, connections)
       responses:
-        '200': {description: Process-local counters including the metrics request}
+        '200':
+          description: Process-local counters including runtime.NumGoroutine, runtime.MemStats, active TCP connections and cumulative GC pause data.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [requests_total, failures_total, goroutines, heap_alloc_bytes, heap_sys_bytes, gc_count, gc_pause_total_ns, connections]
+                properties:
+                  requests_total: {type: integer, format: uint64}
+                  failures_total: {type: integer, format: uint64}
+                  goroutines: {type: integer, format: uint64}
+                  heap_alloc_bytes: {type: integer, format: uint64}
+                  heap_sys_bytes: {type: integer, format: uint64}
+                  gc_count: {type: integer, format: uint64}
+                  gc_pause_total_ns: {type: integer, format: uint64}
+                  connections: {type: integer, format: uint64}
         '500': {$ref: '#/components/responses/InternalError'}
         '503': {$ref: '#/components/responses/Unavailable'}
+      x-profiling: 'Loopback-only GET /debug/pprof/, /debug/pprof/heap, /debug/pprof/goroutine, /debug/pprof/profile, /debug/pprof/trace, /debug/pprof/allocs, /debug/pprof/block, /debug/pprof/mutex, /debug/pprof/threadcreate'
   /v1/score:
     post:
       operationId: scoreEvent
