@@ -57,7 +57,3 @@ Current full native gate evidence: 2026-10-19, Go1.27.2 windows/amd64; `go build
 ## Not applicable
 
 Fraud performs no downstream HTTP calls or downstream writes, so downstream outbox, retry-with-jitter and circuit-breaker requirements do not apply to this service. Playback backoff tests do not change that classification.
-
-## Historical storyboard
-
-`openspec/gifs/playback-flow.gif` is the preserved baseline storyboard, not a current screen capture. Old claims that scores are stateless/unpersisted, float-based or only amount-scored are superseded by the current spec. The old77ms/55.9% baseline is historical, not a current measurement.
